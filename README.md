@@ -1,9 +1,9 @@
 ---
-  title: 万吴兵日报
+  title: CesmEulerStep
   tags:
-    - 万吴兵日报 2018 08-02
+    - 2018 08-02
 ---
-#### 万吴兵日报
+#### EulerStep
 - ***数据***：`qmin(:,:,nets:nete),qmax(:,:,nets:nete)),elem(ie)%spheremp(i,j),elem(ie)%derived%dpdiss_biharmonic(i,j,k),elem(ie)%derived%divdp(i,j,k),Qtens_biharmonic(i,j,k,q,ie),dp_star(i,j,k),elem(ie)%state%Qdp(i,j,k,q,n0_qdp),elem(ie)%derived%vn0(i,j,2,k),elem(ie)%derived%eta_dot_dpdn(:,:,:),elem(ie)%derived%omega_p(:,:,:),elem(ie)%derived%divdp_proj(:,:,:),`, 需要计算更新的是`qmin(:,:,nets:nete),qmax(:,:,nets:nete)),elem(ie)%state%Qdp(i,j,k,q,n0_qdp),Qtens_biharmonic(i,j,k,q,ie)`.
 
 - ***timing***
