@@ -1,0 +1,10 @@
+OBJS = element_mod.o  qdp_time_avg.o
+all: qdp_time_avg
+qdp_time_avg : $(OBJS)
+	gfortran element_mod.o qdp_time_avg.o  -o ./bin/qdp_time_avg
+element_mod.o: element_mod.F90
+	gfortran -c element_mod.F90
+qdp_time_avg.o: qdp_time_avg.F90
+	gfortran -c  qdp_time_avg.F90
+clean:
+	rm *.o rm *.mod
