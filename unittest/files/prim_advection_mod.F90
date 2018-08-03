@@ -1984,7 +1984,7 @@ end subroutine ALE_parametric_coords
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          print *, "#", elem(ie)%derived%divdp_proj(i,j,k)
+          print *, "*", elem(ie)%derived%divdp_proj(i,j,k)
         enddo
       enddo
     enddo

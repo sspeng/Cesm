@@ -57,6 +57,34 @@
 	}\
 }
 
+#define regcomm_bcast_put(src_buf) {\
+	int i, j;\
+	doublev4 d0;\
+	doublev4 *src_p = (doublev4 *)(src_buf);\
+	for (i = 0; i < NLEV; i++) {\
+		for (j = 0; j < NP; j++) {\
+			simd_load(d0, src_p);\
+			REG_PUTR(d0, 0xff);\
+			src_p++;\
+			athread_syn(ROW_SCOPE, 0xff);\
+		}\
+	}\
+}
+
+#define regcomm_bcast_get(dst_buf) {\
+  int i, j;\
+	doublev4 d1;\
+	doublev4 *dst_p = (doublev4 *)(dst_buf);\
+	for (i = 0; i < NLEV; i++) {\
+		for (j = 0; j < NP; j++) {\
+			REG_GETR(d1);\
+			simd_store(d1, dst_p);\
+			dst_p++;\
+			athread_syn(ROW_SCOPE, 0xff);\
+		}\
+	}\
+}
+
 typedef struct {
   long qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr, divdp_proj_leap_ptr, qdp_test_ptr;
   double dt;
@@ -105,10 +133,10 @@ void slave_euler_step_(param_t *param_s) {
   int loop_r = ((nete - nets) + UR*NR - 1)/(UR*NR);
   int c, r, i, j, k, q, ie, cbeg, cend, rbeg, rend, cn, rn;
 
-  if (id == 88)
-    printf("%d\n", block);
-  if (rid == 0)
-    printf("%d", id);
+  //if (id == 88)
+    //printf("%d\n", block);
+  //if (rid == 0)
+    //printf("%d", id);
   for (r = 0; r < loop_r; r++) {
     rbeg = r*NR*UR + rid*UR;
     rend = r*NR*UR + (rid + 1)*UR;
@@ -118,15 +146,11 @@ void slave_euler_step_(param_t *param_s) {
       if (cid == 0) {
         src_dp_ptr = src_dp + (rbeg + ie)*slice_dp;
         dst_dp_ptr = dst_dp;
-        athread_get_(src_qdp_ptr, dst_qdp_ptr, (NLEV*NP*NP*sizeof(double)), 1);
-        int rank;
-        for (rank = 1; rank < 8; rank++) {
-          regcomm_put(R, dst_dp_ptr, rank);
-          athread_syn(COL_SCOPE, 0xff);
-        }
+        athread_get_(src_dp_ptr, dst_dp_ptr, (NLEV*NP*NP*sizeof(double)), 1);
+				regcomm_bcast_put(dst_dp_ptr);
       } else {
-      	regcomm_get(R, dst_dp_ptr);
-      }
+				regcomm_bcast_get(dst_dp_ptr);
+			}
       for (c = 0; c < loop_c; c++) {
         cbeg = c*NC*UC + cid*UC;
         cend = c*NC*UC + (cid + 1)*UC;
