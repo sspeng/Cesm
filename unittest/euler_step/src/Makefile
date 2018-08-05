@@ -14,7 +14,7 @@ hybrid_mod.o: hybrid_mod.F90
 	sw5f90 -host -c hybrid_mod.F90
 hybvcoord_mod.o: hybvcoord_mod.F90
 	sw5f90 -host -c hybvcoord_mod.F90
-slave_euler_step.o: slave_euler_step.c
+slave_euler_step.o: slave_euler_step.c dma_macros.h ldm_alloc.h
 	sw5cc -slave -c slave_euler_step.c -msimd
 euler_step.o: euler_step.F90
 	sw5f90 -host -c euler_step.F90

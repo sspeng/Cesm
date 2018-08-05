@@ -9,8 +9,8 @@ implicit none
   integer :: np1_qdp = 1
   integer :: n0_qdp = 2
   real(kind=real_kind) :: dt = 150.0
-  type(element_t) :: elem(42)
-  type(element_t) :: elem_test(42)
+  type(element_t) :: elem(43)
+  type(element_t) :: elem_test(43)
   type(hybrid_t) :: hybrid
   type(derivative_t) :: deriv
   type(hvcoord_t) :: hvcoord
@@ -55,8 +55,8 @@ implicit none
       do k=1,nlev
         do j=1,np
           do i=1,np
-            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.2
-            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.1
+            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = 8 !ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.2
+            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = 8 !ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.1
           enddo
         enddo
       enddo
@@ -67,8 +67,8 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%dp(i,j,k) = 8.0
-          elem(ie)%derived%divdp_proj(i,j,k) = 2.0
+          elem(ie)%derived%dp(i,j,k) = 20.0
+          elem(ie)%derived%divdp_proj(i,j,k) = 20.0
         enddo
       enddo
     enddo
@@ -110,11 +110,11 @@ implicit none
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
   integer :: kptr
-  type(element_t) :: elem_test(42)
+  type(element_t) :: elem_test(43)
 
   external :: slave_euler_step
   type param_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr, divdp_proj_leap_ptr, qdp_test_ptr
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr, divdp_proj_leap_ptr, qdp_test_ptr, Qtens_biharmonic
     real(kind=real_kind) :: dt
     integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
   end type param_t
@@ -126,6 +126,7 @@ implicit none
   param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
   param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
   param_s%qdp_test_ptr = loc(elem_test(1)%state%Qdp(:,:,:,:,:))
+  param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
   param_s%dt = dt
   param_s%nets = nets
   param_s%nete = nete
@@ -137,6 +138,18 @@ implicit none
   call athread_init()
   call athread_spawn(slave_euler_step, param_s)
   call athread_join()
+
+  do ie=nets,nete
+    do q=1,qsize
+      do k=1,nlev
+        do j=1,np
+          do i=1,np
+            print *, Qtens_biharmonic(i,j,k,q,ie)
+          enddo
+        enddo
+      enddo
+    enddo
+  enddo
 
   qbeg = 1
   qend = qsize
