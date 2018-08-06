@@ -1943,7 +1943,14 @@ integer :: rhs_viss = 0
 integer :: qbeg, qend, kbeg, kend
 integer :: kptr
 
-
+external :: slave_euler_step
+type param_t
+  integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr   &
+      , divdp_proj_leap_ptr, Qtens_biharmonic, qmax, qmin
+  real(kind=real_kind) :: dt
+  integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
+end type param_t
+type(param_t) :: param_s
 
 do k = 1 , nlev
   dp0(k) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
@@ -2028,7 +2035,33 @@ if ( limiter_option == 8  ) then
   print *, "divdp **************************************"
 #endif
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! input data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
+!#define QMAX_SW
+#ifdef QMAX_SW
+call t_startf('sw_qmax')
+param_s%qdp_s_ptr = loc(elem(1)%state%Qdp(:,:,:,:,:))
+param_s%qdp_leap_ptr = loc(elem(2)%state%Qdp(:,:,:,:,:))
+param_s%dp_s_ptr = loc(elem(1)%derived%dp(:,:,:))
+param_s%dp_leap_ptr = loc(elem(2)%derived%dp(:,:,:))
+param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
+param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
+param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+param_s%qmax = loc(qmax)
+param_s%qmin = loc(qmin)
+param_s%dt = dt
+param_s%nets = nets
+param_s%nete = nete
+param_s%np1_qdp = np1_qdp
+param_s%n0_qdp = n0_qdp
+param_s%DSSopt = DSSopt
+param_s%rhs_multiplier = rhs_multiplier
+param_s%qsize = qsize
+call athread_init()
+call athread_spawn(slave_euler_step, param_s)
+call athread_join()
+call t_stopf('sw_qmax')
+!print *, "slave =========================================>"
+#else
+call t_startf('local_qmax')
   do ie = nets , nete
     ! add hyperviscosity to RHS.  apply to Q at timelevel n0, Qdp(n0)/dp
     do k = 1 , nlev    !  Loop index added with implicit inversion (AAM)
@@ -2041,6 +2074,15 @@ if ( limiter_option == 8  ) then
         enddo
       enddo
     enddo
+    do q = 1, qsize
+      do k = 1 , nlev    !  Loop index added with implicit inversion (AAM)
+        do j=1,np
+          do i=1,np
+            Qtens_biharmonic(i,j,k,q,ie) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp)/dp(i,j,k)
+          enddo
+        enddo
+      enddo
+    enddo
   enddo
 
 do ie = nets , nete
@@ -2050,7 +2092,7 @@ do ie = nets , nete
         qmax_val(k) = -1.0e+24
         do j=1,np
           do i=1,np
-            Qtens_biharmonic(i,j,k,q,ie) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp)/dp(i,j,k)
+            !Qtens_biharmonic(i,j,k,q,ie) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp)/dp(i,j,k)
             qmin_val(k) = min(qmin_val(k),Qtens_biharmonic(i,j,k,q,ie))
             qmax_val(k) = max(qmax_val(k),Qtens_biharmonic(i,j,k,q,ie))
           enddo
@@ -2067,12 +2109,15 @@ do ie = nets , nete
       enddo
     enddo
   enddo
+call t_stopf('local_qmax')
+    !print *, "local-------------------------------------------------"
+#endif
 #define PRINT
 !#undef PRINT
 #ifdef PRINT
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then
-    print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
     do ie = nets, nete
       do q = 1, qsize
         do k = 1, nlev
@@ -2080,9 +2125,9 @@ do ie = nets , nete
         enddo
       enddo
     enddo
-    print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
   endif
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #endif
 
   if ( rhs_multiplier == 0 ) then
@@ -2329,6 +2374,8 @@ do ie = nets , nete
 enddo
 !   call t_stopf('euler_step')
 end subroutine euler_step
+
+
 #else
 subroutine euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv , nets , nete , DSSopt , rhs_multiplier )
 ! ===================================
@@ -2350,6 +2397,7 @@ use derivative_mod , only : derivative_t, divergence_sphere, gradient_sphere, vo
 use edge_mod       , only : edgevpack, edgevunpack
 use bndry_mod      , only : bndry_exchangev
 use hybvcoord_mod  , only : hvcoord_t
+use spmd_utils,  only : iam
 #if USE_CUDA_FORTRAN
 use cuda_mod, only: euler_step_cuda
 #endif
@@ -2470,6 +2518,24 @@ if ( limiter_option == 8  ) then
       enddo
     enddo
   enddo
+
+#define PRINT
+  !#undef PRINT
+#ifdef PRINT
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  if (iam == 0) then
+    print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    do ie = nets, nete
+      do q = 1, qsize
+        do k = 1, nlev
+          print *, qmin(k, q, ie), qmax(k, q, ie)
+        enddo
+      enddo
+    enddo
+    print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+  endif
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#endif
 
   if ( rhs_multiplier == 0 ) then
     ! update qmin/qmax based on neighbor data for lim8

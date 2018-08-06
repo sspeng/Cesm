@@ -105,7 +105,10 @@ implicit none
   real(kind=real_kind), dimension(np, np, nlev                  ) :: dp, dp_star
   real(kind=real_kind), dimension(np, np, nlev, qsize, nets:nete) :: Qtens_biharmonic
   real(kind=real_kind), pointer, dimension(:,:,:)                 :: DSSvar
+  real(kind=real_kind), dimension(nlev, qsize, nets:nete        ) :: qmax
+  real(kind=real_kind), dimension(nlev, qsize, nets:nete        ) :: qmin
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
+
   integer :: ie, q, i, j, k
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
@@ -115,7 +118,7 @@ implicit none
   external :: slave_euler_step
   type param_t
     integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr   &
-        , divdp_proj_leap_ptr, Qtens_biharmonic
+        , divdp_proj_leap_ptr, Qtens_biharmonic, qmax, qmin
     real(kind=real_kind) :: dt
     integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
   end type param_t
@@ -127,6 +130,8 @@ implicit none
   param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
   param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
   param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+  param_s%qmax = loc(qmax)
+  param_s%qmin = loc(qmin)
   param_s%dt = dt
   param_s%nets = nets
   param_s%nete = nete
@@ -139,6 +144,8 @@ implicit none
   call athread_spawn(slave_euler_step, param_s)
   call athread_join()
 
+!#define PRINT_QTEN
+#ifdef PRINT_QTEN
   do ie=nets,nete
     do q=1,qsize
       do k=1,nlev
@@ -150,12 +157,20 @@ implicit none
       enddo
     enddo
   enddo
+#else
+  do ie=nets,nete
+    do q=1,qsize
+      do k=1, nlev
+        print *, qmax(k,q,ie), qmin(k,q,ie)
+      enddo
+    enddo
+  enddo
 
   qbeg = 1
   qend = qsize
   kbeg = 1
   kend = nlev
   rhs_viss = 0
-
+#endif
 
 end subroutine euler_step
