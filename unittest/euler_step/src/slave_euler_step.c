@@ -18,7 +18,7 @@
 
 typedef struct {
   long qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr \
-	    , divdp_proj_leap_ptr, qdp_test_ptr, Qtens_biharmonic;
+	    , divdp_proj_leap_ptr, Qtens_biharmonic;
   double dt;
   int  nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize;
 } param_t;
@@ -30,13 +30,14 @@ void slave_euler_step_(param_t *param_s) {
   get_row_id(rid);
   get_col_id(cid);
 	dma_init();
+
+	/*
   long qdp_s_ptr = param_s->qdp_s_ptr;
   long qdp_leap_ptr = param_s->qdp_leap_ptr;
   long dp_s_ptr = param_s->dp_s_ptr;
   long dp_leap_ptr = param_s->dp_leap_ptr;
   long divdp_proj_s_ptr = param_s->divdp_proj_s_ptr;
   long divdp_proj_leap_ptr = param_s->divdp_proj_leap_ptr;
-  long qdp_test_ptr = param_s->qdp_test_ptr;
 	long Qtens_biharmonic_ptr = param_s->Qtens_biharmonic;
   double dt = param_s->dt;
   int nets = param_s->nets;
@@ -46,6 +47,26 @@ void slave_euler_step_(param_t *param_s) {
   int DSSopt = param_s->DSSopt;
   int rhs_multiplier = param_s->rhs_multiplier;
   int qsize = param_s->qsize;
+	*/
+
+	param_t param_d;
+	pe_get(param_s, &param_d, sizeof(param_t));
+	dma_syn();
+	long qdp_s_ptr = param_d.qdp_s_ptr;
+	long qdp_leap_ptr = param_d.qdp_leap_ptr;
+	long dp_s_ptr = param_d.dp_s_ptr;
+	long dp_leap_ptr = param_d.dp_leap_ptr;
+	long divdp_proj_s_ptr = param_d.divdp_proj_s_ptr;
+	long divdp_proj_leap_ptr = param_d.divdp_proj_leap_ptr;
+	long Qtens_biharmonic_ptr = param_d.Qtens_biharmonic;
+	double dt = param_d.dt;
+	int nets = param_d.nets;
+	int nete = param_d.nete;
+	int np1_qdp = param_d.np1_qdp;
+	int n0_qdp = param_d.n0_qdp;
+	int DSSopt = param_d.DSSopt;
+	int rhs_multiplier = param_d.rhs_multiplier;
+	int qsize = param_d.qsize;
 
   int istep_Qten = qsize*NLEV*NP*NP; // stripe in ie axis of Qtens_biharmonic array
 	int qstep_Qten = NLEV*NP*NP;       // stripe in q axis of Qtens_biharmonic array
@@ -92,7 +113,7 @@ void slave_euler_step_(param_t *param_s) {
 				for (j = 0; j < NP; j++) {
 					for (i = 0; i < NP; i++) {
 						pos_dp = k*NP*NP + j*NP + i;
-						dp_l[pos_dp] = dp[pos_dp] - 0; //rhs_multiplier*dt*divdp_proj[pos_dp];
+						dp_l[pos_dp] = dp[pos_dp] - rhs_multiplier*dt*divdp_proj[pos_dp];
 					}
 				}
 			}
@@ -128,7 +149,7 @@ void slave_euler_step_(param_t *param_s) {
     }
   }
 
-  if (id ==0) {
+  if (id == 66) {
     printf("%lf,%d,%d,%d,%d,%d,%d,%d\n", dt, nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize);
   }
 

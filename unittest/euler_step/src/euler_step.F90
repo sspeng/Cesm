@@ -67,8 +67,8 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%dp(i,j,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2) * 2
-          elem(ie)%derived%divdp_proj(i,j,k) = ie * 1000000 + k * 100 + j * 10 + i + 0.2
+          elem(ie)%derived%dp(i,j,k) =  (ie * 1000000 + k * 100 + j * 10 + i + 0.2)*2
+          elem(ie)%derived%divdp_proj(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i + 0.2
         enddo
       enddo
     enddo
@@ -114,7 +114,8 @@ implicit none
 
   external :: slave_euler_step
   type param_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr, divdp_proj_leap_ptr, qdp_test_ptr, Qtens_biharmonic
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr   &
+        , divdp_proj_leap_ptr, Qtens_biharmonic
     real(kind=real_kind) :: dt
     integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
   end type param_t
@@ -125,7 +126,6 @@ implicit none
   param_s%dp_leap_ptr = loc(elem(2)%derived%dp(:,:,:))
   param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
   param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
-  param_s%qdp_test_ptr = loc(elem_test(1)%state%Qdp(:,:,:,:,:))
   param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
   param_s%dt = dt
   param_s%nets = nets
@@ -138,8 +138,7 @@ implicit none
   call athread_init()
   call athread_spawn(slave_euler_step, param_s)
   call athread_join()
-#define PRINT
-#ifdef PRINT
+
   do ie=nets,nete
     do q=1,qsize
       do k=1,nlev
@@ -151,9 +150,6 @@ implicit none
       enddo
     enddo
   enddo
-#else
-  print *, "else"
-#endif
 
   qbeg = 1
   qend = qsize
