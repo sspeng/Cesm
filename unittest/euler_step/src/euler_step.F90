@@ -55,8 +55,8 @@ implicit none
       do k=1,nlev
         do j=1,np
           do i=1,np
-            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = 8 !ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.2
-            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = 8 !ie * 1000000 + q * 10000 + k * 100 + j * 10 + i + 0.1
+            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = ie * 1000000 + k * 100 + j * 10 + i + 0.2
+            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = ie * 1000000 + k * 100 + j * 10 + i + 0.1
           enddo
         enddo
       enddo
@@ -67,8 +67,8 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%dp(i,j,k) = 20.0
-          elem(ie)%derived%divdp_proj(i,j,k) = 20.0
+          elem(ie)%derived%dp(i,j,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2) * 2
+          elem(ie)%derived%divdp_proj(i,j,k) = ie * 1000000 + k * 100 + j * 10 + i + 0.2
         enddo
       enddo
     enddo
@@ -138,7 +138,8 @@ implicit none
   call athread_init()
   call athread_spawn(slave_euler_step, param_s)
   call athread_join()
-
+#define PRINT
+#ifdef PRINT
   do ie=nets,nete
     do q=1,qsize
       do k=1,nlev
@@ -150,6 +151,9 @@ implicit none
       enddo
     enddo
   enddo
+#else
+  print *, "else"
+#endif
 
   qbeg = 1
   qend = qsize

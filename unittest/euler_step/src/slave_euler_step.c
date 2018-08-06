@@ -15,19 +15,6 @@
 #define REG_GETR(var) asm volatile ("getr %0":"=r"(var))
 #define REG_GETC(var) asm volatile ("getc %0":"=r"(var))
 
-#define athread_get_(src, dst, size_block, n_reply) {\
-	get_reply = 0;\
-	athread_get(PE_MODE, src, dst, size_block, &get_reply, 0, 0, 0);\
-	while(get_reply!=n_reply);\
-	asm volatile("memb\n\t");\
-}
-
-#define athread_put_(src, dst, size_block, n_reply) {\
-	put_reply = 0;\
-	athread_put(PE_MODE, src, dst, size_block, &put_reply, 0, 0);\
-	while(put_reply!=n_reply);\
-	asm volatile("memb\n\t");\
-}
 
 typedef struct {
   long qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr \
