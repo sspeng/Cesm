@@ -10,6 +10,7 @@
 #define stripe_qdp (NLEV*NP*NP)
 #define qstep_Qten (NLEV*NP*NP)       // stripe in q axis of Qtens_biharmonic array
 #define qstep_qmax  NLEV
+#define block  (UC*NLEV*NP*NP)
 
 
 #define get_row_id(rid) asm volatile ("rcsr %0, 1" : "=r"(rid))
@@ -23,8 +24,8 @@
 
 
 typedef struct {
-  long qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr \
-	    , divdp_proj_leap_ptr, Qtens_biharmonic, qmax, qmin;
+  long qdp_s_ptr, qdp_leap_ptr, dp_s_ptr, divdp_proj_s_ptr \
+	    , Qtens_biharmonic, qmax, qmin;
   double dt;
   int  nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize;
 } param_t;
@@ -62,9 +63,7 @@ void slave_euler_step_(param_t *param_s) {
 	long qdp_s_ptr = param_d.qdp_s_ptr;
 	long qdp_leap_ptr = param_d.qdp_leap_ptr;
 	long dp_s_ptr = param_d.dp_s_ptr;
-	long dp_leap_ptr = param_d.dp_leap_ptr;
 	long divdp_proj_s_ptr = param_d.divdp_proj_s_ptr;
-	long divdp_proj_leap_ptr = param_d.divdp_proj_leap_ptr;
 	long Qtens_biharmonic_ptr = param_d.Qtens_biharmonic;
 	long qmax_ptr = param_d.qmax;
 	long qmin_ptr = param_d.qmin;
@@ -79,7 +78,6 @@ void slave_euler_step_(param_t *param_s) {
 
   int istep_Qten = qsize*NLEV*NP*NP; // stripe in ie axis of Qtens_biharmonic array
 	int istep_qmax = qsize*NLEV;
-  int block = UC*NLEV*NP*NP;
   double Qdp[block];
   double dp[NLEV*NP*NP];
 	double divdp_proj[NLEV*NP*NP];
@@ -94,8 +92,6 @@ void slave_euler_step_(param_t *param_s) {
 	//ldm_alloc(qmin, (nete - nets + 1)*qsize*NLEV);
 
   int slice_qdp = (int)((qdp_leap_ptr - qdp_s_ptr)/sizeof(double));  //stripe in ie axis of elem.state.Qdp
-  int slice_dp = (int)((dp_leap_ptr - dp_s_ptr)/sizeof(double));     //stripe in ie axis of elem.deriv.dp
-	int slice_divdp_proj = (int)((divdp_proj_leap_ptr - divdp_proj_s_ptr)/sizeof(double));
   double *src_np1_qdp = (double *)(qdp_s_ptr) + (np1_qdp - 1)*qsize*stripe_qdp;
   double *src_n0_qdp = (double *)(qdp_s_ptr) + (n0_qdp - 1)*qsize*stripe_qdp;
   double *src_dp = (double *)(dp_s_ptr);
@@ -113,10 +109,6 @@ void slave_euler_step_(param_t *param_s) {
 	int loop_c = (qsize + UC*NC - 1)/(UC*NC);
   int c, r, i, j, k, q, ie, cbeg, cend, rbeg, rend, cn, rn, pos_dp, pos_qdp, pos_Qtens_bi, pos_qmax;
 
-  //if (id == 88)
-    //printf("%d\n", block);
-  //if (rid == 0)
-    //printf("%d", id);
   for (r = 0; r < loop_r; r++) {
     rbeg = r*NR*UR + rid*UR;
     rend = r*NR*UR + (rid + 1)*UR;
@@ -124,8 +116,8 @@ void slave_euler_step_(param_t *param_s) {
     rn = rend - rbeg;
 		rn = rn < 0 ? 0 : rn;
     for (ie = 0; ie < rn; ie++) {
-			src_dp_ptr = src_dp + (rbeg + ie)*slice_dp;
-			src_divdp_proj_ptr = src_divdp_proj + (rbeg + ie)*slice_divdp_proj;
+			src_dp_ptr = src_dp + (rbeg + ie)*slice_qdp;
+			src_divdp_proj_ptr = src_divdp_proj + (rbeg + ie)*slice_qdp;
       pe_get(src_dp_ptr, dp, (NLEV*NP*NP*sizeof(double)));
 			pe_get(src_divdp_proj_ptr, divdp_proj, (NLEV*NP*NP*sizeof(double)));
 			dma_syn();
@@ -186,19 +178,4 @@ void slave_euler_step_(param_t *param_s) {
 
 	//ldm_dealloc(qmax);
 	//ldm_dealloc(qmin);
-
-  if (id == 66) {
-    printf("%lf,%d,%d,%d,%d,%d,%d,%d\n", dt, nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize);
-  }
-
-  if (id == 66) {
-    //athread_get_(src_n0_qdp, dst_qdp, (block*sizeof(double)), 1);
-		pe_get(src_n0_qdp, Qdp, block*sizeof(double));
-		dma_syn();
-    int i;
-    for(i = 0; i < block; i++) {
-      printf("%lf\n", Qdp[i]);
-    }
-//    athread_put_(dst_qdp, src_n0_qdp, (block*sizeof(double)), 1);
-  }
 }

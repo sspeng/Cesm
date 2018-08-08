@@ -106,34 +106,6 @@ if ( limiter_option == 8  ) then
   ! initialize dp, and compute Q from Qdp (and store Q in Qtens_biharmonic)
   call t_startf('euler_step_limiter_option_8')
   call t_startf('qmin_qmax')
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! input data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  print *, "qdp ######################################"
-  do ie = nets, nete
-    do q = 1, qsize
-      do k = 1, nelv
-        do j = 1, np
-          do i = 1, np
-            print *, "#", elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
-          enddo
-        enddo
-      enddo
-    enddo
-  enddo
-  print *, "qdp ######################################"
-  print *, "qdp **************************************"
-  do ie = nets, nete
-    do k = 1, nelv
-      do j = 1, np
-        do i = 1, np
-          print *, "#", elem(ie)%derived%divdp_proj(i,j,k)
-        enddo
-      enddo
-    enddo
-  enddo
-  print *, "qdp **************************************"
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! input data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   do ie = nets , nete
     ! add hyperviscosity to RHS.  apply to Q at timelevel n0, Qdp(n0)/dp
     do k = 1 , nlev    !  Loop index added with implicit inversion (AAM)
@@ -170,19 +142,6 @@ if ( limiter_option == 8  ) then
       enddo
     enddo
   enddo
-
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-  do ie = nets, nete
-    do q = 1, qsize
-      do k = 1, nlev
-        print *, qmin(k, q, ie), qmax(k, q, ie)
-      enddo
-    enddo
-  enddo
-  print *, ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
   call t_stopf('qmin_qmax')
   if ( rhs_multiplier == 0 ) then
     ! update qmin/qmax based on neighbor data for lim8
@@ -460,3 +419,125 @@ enddo
 call t_stopf('euler_step_2d_advec_2')
 call t_stopf('euler_step')
 end subroutine euler_step
+
+
+
+
+
+
+
+#ifdef LIMITER_REWRITE_OPT
+  subroutine limiter_optim_iter_full(ptens,sphweights,minp,maxp,dpmass)
+    !
+    !The idea here is the following: We need to find a grid field which is closest
+    !to the initial field (in terms of weighted sum), but satisfies the min/max constraints.
+    !So, first we find values which do not satisfy constraints and bring these values
+    !to a closest constraint. This way we introduce some mass change (addmass),
+    !so, we redistribute addmass in the way that l2 error is smallest.
+    !This redistribution might violate constraints thus, we do a few iterations.
+    !
+    ! O. Guba ~2012                    Documented in Guba, Taylor & St-Cyr, JCP 2014
+    ! I. Demeshko & M. Taylor 7/2015:  Removed indirect addressing.
+    ! N. Lopez & M. Taylor 8/2015:     Mass redistributon tweak which is better at
+    !                                  linear coorelation preservation
+    !
+    use kinds         , only : real_kind
+    use dimensions_mod, only : np, nlev
+
+    real (kind=real_kind), dimension(nlev), intent(inout)   :: minp, maxp
+    real (kind=real_kind), dimension(np*np,nlev), intent(inout)   :: ptens
+    real (kind=real_kind), dimension(np*np,nlev), intent(in), optional  :: dpmass
+    real (kind=real_kind), dimension(np*np), intent(in)   :: sphweights
+
+    real (kind=real_kind), dimension(np,np) :: ptens_mass
+    integer  k1, k, i, j, iter, weightsnum
+    real (kind=real_kind) :: addmass, weightssum, mass, sumc
+    real (kind=real_kind) :: x(np*np),c(np*np)
+    integer :: maxiter = np*np-1
+    real (kind=real_kind) :: tol_limiter = 5e-14
+
+    do k = 1, nlev
+
+     do k1=1,np*np
+       c(k1)=sphweights(k1)*dpmass(k1,k)
+       x(k1)=ptens(k1,k)/dpmass(k1,k)
+     enddo
+
+     sumc=sum(c)
+     if (sumc <= 0 ) CYCLE   ! this should never happen, but if it does, dont limit
+     mass=sum(c*x)
+
+      ! relax constraints to ensure limiter has a solution:
+      ! This is only needed if runnign with the SSP CFL>1 or
+      ! due to roundoff errors
+      if( mass < minp(k)*sumc ) then
+        minp(k) = mass / sumc
+      endif
+      if( mass > maxp(k)*sumc ) then
+        maxp(k) = mass / sumc
+      endif
+
+      do iter=1,maxiter
+
+      addmass=0.0d0
+
+       do k1=1,np*np
+         if((x(k1)>maxp(k))) then
+           addmass=addmass+(x(k1)-maxp(k))*c(k1)
+           x(k1)=maxp(k)
+         endif
+         if((x(k1)<minp(k))) then
+           addmass=addmass-(minp(k)-x(k1))*c(k1)
+           x(k1)=minp(k)
+         endif
+       enddo !k1
+
+       if(abs(addmass)<=tol_limiter*abs(mass)) exit
+
+       weightssum=0.0d0
+!       weightsnum=0
+       if(addmass>0)then
+        do k1=1,np*np
+          if(x(k1)<maxp(k))then
+            weightssum=weightssum+c(k1)
+!            weightsnum=weightsnum+1
+          endif
+        enddo !k1
+        do k1=1,np*np
+          if(x(k1)<maxp(k))then
+              x(k1)=x(k1)+addmass/weightssum
+!              x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
+          endif
+        enddo
+      else
+        do k1=1,np*np
+          if(x(k1)>minp(k))then
+            weightssum=weightssum+c(k1)
+!            weightsnum=weightsnum+1
+          endif
+        enddo
+        do k1=1,np*np
+          if(x(k1)>minp(k))then
+            x(k1)=x(k1)+addmass/weightssum
+!           x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
+          endif
+        enddo
+      endif
+
+
+   enddo!end of iteration
+
+   do k1=1,np*np
+      ptens(k1,k)=x(k1)
+   enddo
+
+  enddo
+
+  do k = 1, nlev
+    do k1=1,np*np
+      ptens(k1,k)=ptens(k1,k)*dpmass(k1,k)
+    enddo
+  enddo
+
+  end subroutine limiter_optim_iter_full
+#endif

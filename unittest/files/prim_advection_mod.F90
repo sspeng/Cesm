@@ -1936,6 +1936,10 @@ real(kind=real_kind), dimension(np,np,2,nlev                ) :: Vstar
 real(kind=real_kind), dimension(np,np  ,nlev                ) :: Qtens
 real(kind=real_kind), dimension(np,np  ,nlev                ) :: dp,dp_star
 real(kind=real_kind), dimension(np,np  ,nlev,qsize,nets:nete) :: Qtens_biharmonic
+real(kind=real_kind), dimension(np,np  ,nlev      ,nets:nete) :: dp_temp
+real(kind=real_kind), dimension(np,np,2,nlev,qsize,nets:nete) :: gradQ_temp
+real(kind=real_kind), dimension(np,np  ,nlev,qsize,nets:nete) :: dp_star_temp
+real(kind=real_kind), dimension(np,np  ,nlev,qsize,nets:nets) :: Qtens_temp
 real(kind=real_kind), pointer, dimension(:,:,:)               :: DSSvar
 real(kind=real_kind) :: dp0(nlev),qmin_val(nlev),qmax_val(nlev)
 integer :: ie,q,i,j,k
@@ -1945,8 +1949,8 @@ integer :: kptr
 
 external :: slave_euler_step
 type param_t
-  integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr   &
-      , divdp_proj_leap_ptr, Qtens_biharmonic, qmax, qmin
+  integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, divdp_proj_s_ptr   &
+      , Qtens_biharmonic, qmax, qmin
   real(kind=real_kind) :: dt
   integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
 end type param_t
@@ -2035,15 +2039,13 @@ if ( limiter_option == 8  ) then
   print *, "divdp **************************************"
 #endif
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! input data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!#define QMAX_SW
+#define QMAX_SW
 #ifdef QMAX_SW
 call t_startf('sw_qmax')
-param_s%qdp_s_ptr = loc(elem(1)%state%Qdp(:,:,:,:,:))
-param_s%qdp_leap_ptr = loc(elem(2)%state%Qdp(:,:,:,:,:))
-param_s%dp_s_ptr = loc(elem(1)%derived%dp(:,:,:))
-param_s%dp_leap_ptr = loc(elem(2)%derived%dp(:,:,:))
-param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
-param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
+param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+param_s%dp_s_ptr = loc(elem(nets)%derived%dp(:,:,:))
+param_s%divdp_proj_s_ptr = loc(elem(nets)%derived%divdp_proj(:,:,:))
 param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
 param_s%qmax = loc(qmax)
 param_s%qmin = loc(qmin)
@@ -2235,9 +2237,12 @@ do ie = nets , nete
     ! but that's ok because rhs_multiplier=0 on the first stage:
     do j=1,np
       do i=1,np
-        dp(i,j,k) = elem(ie)%derived%dp(i,j,k) - rhs_multiplier * dt * elem(ie)%derived%divdp_proj(i,j,k)
-        Vstar(i,j,1,k) = elem(ie)%derived%vn0(i,j,1,k) / dp(i,j,k)
-        Vstar(i,j,2,k) = elem(ie)%derived%vn0(i,j,2,k) / dp(i,j,k)
+        !dp(i,j,k) = elem(ie)%derived%dp(i,j,k) - rhs_multiplier * dt * elem(ie)%derived%divdp_proj(i,j,k)
+        !Vstar(i,j,1,k) = elem(ie)%derived%vn0(i,j,1,k) / dp(i,j,k)
+        !Vstar(i,j,2,k) = elem(ie)%derived%vn0(i,j,2,k) / dp(i,j,k)
+        dp_temp(i,j,k,ie) = elem(ie)%derived%dp(i,j,k) - rhs_multiplier * dt * elem(ie)%derived%divdp_proj(i,j,k)
+        Vstar(i,j,1,k) = elem(ie)%derived%vn0(i,j,1,k) / dp_temp(i,j,k,ie)
+        Vstar(i,j,2,k) = elem(ie)%derived%vn0(i,j,2,k) / dp_temp(i,j,k,ie)
       enddo
     enddo
   enddo
@@ -2249,17 +2254,33 @@ do ie = nets , nete
 
       do j=1,np
         do i=1,np
-          gradQ(i,j,1) = Vstar(i,j,1,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
-          gradQ(i,j,2) = Vstar(i,j,2,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
+          !gradQ(i,j,1) = Vstar(i,j,1,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
+          !gradQ(i,j,2) = Vstar(i,j,2,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
+          gradQ_temp(i,j,1,k,q,ie) = Vstar(i,j,1,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
+          gradQ_temp(i,j,2,k,q,ie) = Vstar(i,j,2,k) * elem(ie)%state%Qdp(i,j,k,q,n0_qdp)
         enddo
       enddo
+    enddo
+  enddo
+enddo
 
+do ie = nets, nete
+  do q = 1, qsize
+    do k = 1, nlev
       ! dp_star(:,:,k) = divergence_sphere( gradQ , deriv , elem(ie) )
-      call divergence_sphere( gradQ , deriv , elem(ie), dp_star(:,:,k) )
+      !call divergence_sphere( gradQ_temp(:,:,:) , deriv , elem(ie), dp_star(:,:,k) )
+      call divergence_sphere( gradQ_temp(:,:,:,k,q,ie) , deriv , elem(ie), dp_star_temp(:,:,k,q,ie) )
+    enddo
+  enddo
+enddo
 
+do ie = nets, nete
+  do q = 1, qsize
+    do k = 1, nlev
       do j=1,np
         do i=1,np
-          Qtens(i,j,k) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp) - dt * dp_star(i,j,k)
+          !Qtens(i,j,k) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp) - dt * dp_star(i,j,k)
+          Qtens_temp(i,j,k,q,ie) = elem(ie)%state%Qdp(i,j,k,q,n0_qdp) - dt * dp_star_temp(i,j,k,q,ie)
         enddo
       enddo
 
@@ -2267,7 +2288,8 @@ do ie = nets , nete
       if ( rhs_viss /= 0 ) then
         do j=1,np
           do i=1,np
-            Qtens(i,j,k) = Qtens(i,j,k) + Qtens_biharmonic(i,j,k,q,ie)
+            !Qtens(i,j,k) = Qtens(i,j,k) + Qtens_biharmonic(i,j,k,q,ie)
+            Qtens_temp(i,j,k,q,ie) = Qtens_temp(i,j,k,q,ie) + Qtens_biharmonic(i,j,k,q,ie)
           enddo
         enddo
       endif
@@ -2278,7 +2300,8 @@ do ie = nets , nete
         ! UN-DSS'ed dp at timelevel n0+1:
         do j=1,np
           do i=1,np
-            dp_star(i,j,k) = dp(i,j,k) - dt * elem(ie)%derived%divdp(i,j,k)
+            !dp_star(i,j,k) = dp(i,j,k) - dt * elem(ie)%derived%divdp(i,j,k)
+            dp_star_temp(i,j,k,q,ie) = dp_temp(i,j,k,ie) - dt * elem(ie)%derived%divdp(i,j,k)
           enddo
         enddo
 
@@ -2288,14 +2311,17 @@ do ie = nets , nete
          do j=1,np
             do i=1,np
                 dpdiss(i,j) = elem(ie)%derived%dpdiss_biharmonic(i,j,k)
-             dp_star(i,j,k) = dp_star(i,j,k) - rhs_viss * dt * nu_q * dpdiss(i,j) / elem(ie)%spheremp(i,j)
+             !dp_star(i,j,k) = dp_star(i,j,k) - rhs_viss * dt * nu_q * dpdiss(i,j) / elem(ie)%spheremp(i,j)
+             dp_star_temp(i,j,k,q,ie) = dp_star_temp(i,j,k,q,ie) - rhs_viss * dt * nu_q * dpdiss(i,j) / elem(ie)%spheremp(i,j)
             enddo
           enddo
         endif
       enddo
       ! apply limiter to Q = Qtens / dp_star
-      call limiter_optim_iter_full( Qtens(:,:,:) , elem(ie)%spheremp(:,:) , qmin(:,q,ie) , &
-                                    qmax(:,q,ie) , dp_star(:,:,:))
+      !call limiter_optim_iter_full( Qtens(:,:,:) , elem(ie)%spheremp(:,:) , qmin(:,q,ie) , &
+                                    !qmax(:,q,ie) , dp_star(:,:,:))
+      call limiter_optim_iter_full( Qtens_temp(:,:,:,q,ie) , elem(ie)%spheremp(:,:) , qmin(:,q,ie) , &
+                                    qmax(:,q,ie) , dp_star_temp(:,:,:,q,ie))
     endif
 
 
@@ -2305,7 +2331,8 @@ do ie = nets , nete
     do k = 1 , nlev
       do j=1,np
         do i=1,np
-          elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens(i,j,k)
+          !elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens(i,j,k)
+          elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens_temp(i,j,k,q,ie)
         enddo
       enddo
     enddo
@@ -2316,27 +2343,28 @@ do ie = nets , nete
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
       call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
     endif
+  enddo
+enddo
 
+do ie = nets, nete
+  do q = 1, qsize
     kptr = nlev*(q-1)
     call edgeVpack(edgeAdvp1  , elem(ie)%state%Qdp(:,:,:,q,np1_qdp) , nlev , kptr , ie )
 
-   enddo
-
-
-   if ( DSSopt == DSSeta         ) DSSvar => elem(ie)%derived%eta_dot_dpdn(:,:,:)
-   if ( DSSopt == DSSomega       ) DSSvar => elem(ie)%derived%omega_p(:,:,:)
-   if ( DSSopt == DSSdiv_vdp_ave ) DSSvar => elem(ie)%derived%divdp_proj(:,:,:)
-   ! also DSS extra field
-   do k = 1 , nlev
-     do j=1,np
-        do i=1,np
-          DSSvar(i,j,k) = elem(ie)%spheremp(i,j) * DSSvar(i,j,k)
-        enddo
+  enddo
+  if ( DSSopt == DSSeta         ) DSSvar => elem(ie)%derived%eta_dot_dpdn(:,:,:)
+  if ( DSSopt == DSSomega       ) DSSvar => elem(ie)%derived%omega_p(:,:,:)
+  if ( DSSopt == DSSdiv_vdp_ave ) DSSvar => elem(ie)%derived%divdp_proj(:,:,:)
+  ! also DSS extra field
+  do k = 1 , nlev
+  do j=1,np
+     do i=1,np
+       DSSvar(i,j,k) = elem(ie)%spheremp(i,j) * DSSvar(i,j,k)
      enddo
-   enddo
-
-   kptr = nlev*qsize
-   call edgeVpack( edgeAdvp1 , DSSvar(:,:,1:nlev) , nlev , kptr , ie )
+  enddo
+  enddo
+  kptr = nlev*qsize
+  call edgeVpack( edgeAdvp1 , DSSvar(:,:,1:nlev) , nlev , kptr , ie )
 enddo
 
 call bndry_exchangeV( hybrid , edgeAdvp1    )
@@ -2727,7 +2755,7 @@ do ie = nets , nete
     kptr = nlev*(q-1)
     call edgeVpack(edgeAdvp1  , elem(ie)%state%Qdp(:,:,:,q,np1_qdp) , nlev , kptr , ie )
 
-   enddo
+  enddo
 
 
    if ( DSSopt == DSSeta         ) DSSvar => elem(ie)%derived%eta_dot_dpdn(:,:,:)

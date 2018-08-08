@@ -29,7 +29,7 @@ implicit none
   real(kind=real_kind), dimension(np, np, nlev, qsize, nets:nete) :: Qtens_biharmonic
   real(kind=real_kind), pointer, dimension(:,:,:)                 :: DSSvar
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
-  integer :: ie, q, i, j, k
+  integer :: ie, q, i, j, k, d
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
   integer :: kptr
@@ -74,6 +74,19 @@ implicit none
     enddo
   enddo
 
+  do ie = nets, nete
+    do k = 1, nlev
+      do d = 1, 2
+        do j = 1, np
+          do i = 1, np
+            elem(ie)%derived%vn0(i,j,1,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2)
+            elem(ie)%derived%vn0(i,j,2,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2)*2
+          enddo
+        enddo
+      enddo
+    enddo
+  enddo
+
 
   call euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv , nets , nete , DSSopt , rhs_multiplier )
 end program main
@@ -96,53 +109,75 @@ implicit none
   integer, intent(in) :: nete
   integer :: DSSopt
   integer :: rhs_multiplier
-  real(kind=real_kind), dimension(np, np                        ) :: divdp, dpdiss
-  real(kind=real_kind), dimension(np, np                        ) :: div
-  real(kind=real_kind), dimension(np, np, nlev                  ) :: dpdissk
-  real(kind=real_kind), dimension(np, np, 2                     ) :: gradQ
-  real(kind=real_kind), dimension(np, np, 2, nlev               ) :: Vstar
-  real(kind=real_kind), dimension(np, np, nlev                  ) :: Qtens
-  real(kind=real_kind), dimension(np, np, nlev                  ) :: dp, dp_star
-  real(kind=real_kind), dimension(np, np, nlev, qsize, nets:nete) :: Qtens_biharmonic
-  real(kind=real_kind), pointer, dimension(:,:,:)                 :: DSSvar
-  real(kind=real_kind), dimension(nlev, qsize, nets:nete        ) :: qmax
-  real(kind=real_kind), dimension(nlev, qsize, nets:nete        ) :: qmin
+  real(kind=real_kind), dimension(np, np                           ) :: divdp, dpdiss
+  real(kind=real_kind), dimension(np, np                           ) :: div
+  real(kind=real_kind), dimension(np, np,    nlev                  ) :: dpdissk
+  real(kind=real_kind), dimension(np, np, 2                        ) :: gradQ
+  real(kind=real_kind), dimension(np, np, 2, nlev                  ) :: Vstar
+  real(kind=real_kind), dimension(np, np,    nlev                  ) :: Qtens
+  real(kind=real_kind), dimension(np, np,    nlev                  ) :: dp, dp_star
+  real(kind=real_kind), dimension(np, np,    nlev, qsize, nets:nete) :: Qtens_biharmonic
+  real(kind=real_kind), dimension(np, np,    nlev,        nets:nete) :: dp_temp
+  real(kind=real_kind), dimension(np, np, 2, nlev, qsize, nets:nete) :: gradQ_temp
+  real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmax
+  real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmin
+  real(kind=real_kind), pointer, dimension(:,:,:) :: DSSvar
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
 
-  integer :: ie, q, i, j, k
+  integer :: ie, q, i, j, k, d
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
   integer :: kptr
   type(element_t) :: elem_test(43)
 
-  external :: slave_euler_step
-  type param_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr,dp_s_ptr, dp_leap_ptr, divdp_proj_s_ptr   &
-        , divdp_proj_leap_ptr, Qtens_biharmonic, qmax, qmin
+!#define QMAX
+!#ifdef QMAX
+!  external :: slave_euler_step
+!  type param_t
+!    integer*8 :: qdp_s_ptr, qdp_leap_ptr, dp_s_ptr, divdp_proj_s_ptr   &
+!        , Qtens_biharmonic, qmax, qmin
+!    real(kind=real_kind) :: dt
+!    integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
+!  end type param_t
+!  type(param_t) :: param_s
+!  param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+!  param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+!  param_s%dp_s_ptr = loc(elem(nets)%derived%dp(:,:,:))
+!  param_s%divdp_proj_s_ptr = loc(elem(nets)%derived%divdp_proj(:,:,:))
+!  param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+!  param_s%qmax = loc(qmax)
+!  param_s%qmin = loc(qmin)
+!  param_s%dt = dt
+!  param_s%nets = nets
+!  param_s%nete = nete
+!  param_s%np1_qdp = np1_qdp
+!  param_s%n0_qdp = n0_qdp
+!  param_s%DSSopt = DSSopt
+!  param_s%rhs_multiplier = rhs_multiplier
+!  param_s%qsize = qsize
+!  call athread_init()
+!  call athread_spawn(slave_euler_step, param_s)
+!  call athread_join()
+!#else
+  external :: slave_euler_v
+  type param_2d_t
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, vn0, dp_temp, gradQ_temp
     real(kind=real_kind) :: dt
-    integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
-  end type param_t
-  type(param_t) :: param_s
-  param_s%qdp_s_ptr = loc(elem(1)%state%Qdp(:,:,:,:,:))
-  param_s%qdp_leap_ptr = loc(elem(2)%state%Qdp(:,:,:,:,:))
-  param_s%dp_s_ptr = loc(elem(1)%derived%dp(:,:,:))
-  param_s%dp_leap_ptr = loc(elem(2)%derived%dp(:,:,:))
-  param_s%divdp_proj_s_ptr = loc(elem(1)%derived%divdp_proj(:,:,:))
-  param_s%divdp_proj_leap_ptr = loc(elem(2)%derived%divdp_proj(:,:,:))
-  param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
-  param_s%qmax = loc(qmax)
-  param_s%qmin = loc(qmin)
-  param_s%dt = dt
-  param_s%nets = nets
-  param_s%nete = nete
-  param_s%np1_qdp = np1_qdp
-  param_s%n0_qdp = n0_qdp
-  param_s%DSSopt = DSSopt
-  param_s%rhs_multiplier = rhs_multiplier
-  param_s%qsize = qsize
-  call athread_init()
-  call athread_spawn(slave_euler_step, param_s)
-  call athread_join()
+    integer :: nets, nete, rhs_multiplier, qsize
+  end type param_2d_t
+  type(param_2d_t) :: param_2d_s
+  param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+  param_2d_s%qdp_leap_ptr = loc(elem((nets+1)%state%Qdp(:,:,:,:,:))
+  param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+  param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+  param_2d_s%dp_temp = loc(dp_temp(:,:,:,:))
+  param_2d_s%gradQ_temp = loc(gradQ_temp(:,:,:,:,:,:))
+  param_2d_s%dt = dt
+  param_2d_s%nets = nets
+  param_2d_s%nete = nete
+  param_2d_s%rhs_multiplier = rhs_multiplier
+  param_2d_s%qsize = qsize
+!#endif
 
 !#define PRINT_QTEN
 #ifdef PRINT_QTEN
