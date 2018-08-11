@@ -312,7 +312,7 @@ do ie = nets , nete
         enddo
 
         if ( nu_p > 0 .and. rhs_viss /= 0 ) then
-          ! add contribution from UN-DSS'ed PS dissipation
+          ! add contribution from un-dss'ed ps dissipation
 !            dpdiss(:,:) = ( hvcoord%hybi(k+1) - hvcoord%hybi(k) ) * elem(ie)%derived%psdiss_biharmonic(:,:)
          do j=1,np
             do i=1,np
@@ -322,9 +322,9 @@ do ie = nets , nete
           enddo
         endif
       enddo
-      ! apply limiter to Q = Qtens / dp_star
+      ! apply limiter to q = qtens / dp_star
       call t_startf('limiter_optim_iter_full')
-      call limiter_optim_iter_full( Qtens(:,:,:) , elem(ie)%spheremp(:,:) , qmin(:,q,ie) , &
+      call limiter_optim_iter_full( qtens(:,:,:) , elem(ie)%spheremp(:,:) , qmin(:,q,ie) , &
                                     qmax(:,q,ie) , dp_star(:,:,:))
       call t_stopf('limiter_optim_iter_full')
     endif
@@ -336,7 +336,7 @@ do ie = nets , nete
     do k = 1 , nlev
       do j=1,np
         do i=1,np
-          elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens(i,j,k)
+          elem(ie)%state%qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * qtens(i,j,k)
         enddo
       enddo
     enddo
@@ -346,13 +346,13 @@ do ie = nets , nete
       ! sign-preserving limiter, applied after mass matrix
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
       call t_startf('limiter2d_zero')
-      call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
+      call limiter2d_zero( elem(ie)%state%qdp(:,:,:,q,np1_qdp))
       call t_stopf('limiter2d_zero')
     endif
 
     kptr = nlev*(q-1)
-    call t_startf('edgeVpack_1')
-    call edgeVpack(edgeAdvp1  , elem(ie)%state%Qdp(:,:,:,q,np1_qdp) , nlev , kptr , ie )
+    call t_startf('edgevpack_1')
+    call edgevpack(edgeadvp1  , elem(ie)%state%Qdp(:,:,:,q,np1_qdp) , nlev , kptr , ie )
     call t_stopf('edgeVpack_1')
    enddo
 
@@ -458,14 +458,14 @@ end subroutine euler_step
 
     do k = 1, nlev
 
-     do k1=1,np*np
-       c(k1)=sphweights(k1)*dpmass(k1,k)
-       x(k1)=ptens(k1,k)/dpmass(k1,k)
-     enddo
+      do k1=1,np*np
+        c(k1)=sphweights(k1)*dpmass(k1,k)
+        x(k1)=ptens(k1,k)/dpmass(k1,k)
+      enddo
 
-     sumc=sum(c)
-     if (sumc <= 0 ) CYCLE   ! this should never happen, but if it does, dont limit
-     mass=sum(c*x)
+      sumc=sum(c)
+      if (sumc <= 0 ) CYCLE   ! this should never happen, but if it does, dont limit
+      mass=sum(c*x)
 
       ! relax constraints to ensure limiter has a solution:
       ! This is only needed if runnign with the SSP CFL>1 or
@@ -479,65 +479,62 @@ end subroutine euler_step
 
       do iter=1,maxiter
 
-      addmass=0.0d0
+        addmass=0.0d0
 
-       do k1=1,np*np
-         if((x(k1)>maxp(k))) then
-           addmass=addmass+(x(k1)-maxp(k))*c(k1)
-           x(k1)=maxp(k)
-         endif
-         if((x(k1)<minp(k))) then
-           addmass=addmass-(minp(k)-x(k1))*c(k1)
-           x(k1)=minp(k)
-         endif
-       enddo !k1
-
-       if(abs(addmass)<=tol_limiter*abs(mass)) exit
-
-       weightssum=0.0d0
-!       weightsnum=0
-       if(addmass>0)then
         do k1=1,np*np
-          if(x(k1)<maxp(k))then
-            weightssum=weightssum+c(k1)
-!            weightsnum=weightsnum+1
+          if((x(k1)>maxp(k))) then
+            addmass=addmass+(x(k1)-maxp(k))*c(k1)
+            x(k1)=maxp(k)
+          endif
+          if((x(k1)<minp(k))) then
+            addmass=addmass-(minp(k)-x(k1))*c(k1)
+            x(k1)=minp(k)
           endif
         enddo !k1
-        do k1=1,np*np
-          if(x(k1)<maxp(k))then
+
+        if(abs(addmass)<=tol_limiter*abs(mass)) exit
+
+        weightssum=0.0d0
+!        weightsnum=0
+        if(addmass>0)then
+          do k1=1,np*np
+            if(x(k1)<maxp(k))then
+              weightssum=weightssum+c(k1)
+!              weightsnum=weightsnum+1
+            endif
+          enddo !k1
+          do k1=1,np*np
+            if(x(k1)<maxp(k))then
+                x(k1)=x(k1)+addmass/weightssum
+!                x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
+            endif
+          enddo
+        else
+          do k1=1,np*np
+            if(x(k1)>minp(k))then
+              weightssum=weightssum+c(k1)
+!              weightsnum=weightsnum+1
+            endif
+          enddo
+          do k1=1,np*np
+            if(x(k1)>minp(k))then
               x(k1)=x(k1)+addmass/weightssum
-!              x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
-          endif
-        enddo
-      else
-        do k1=1,np*np
-          if(x(k1)>minp(k))then
-            weightssum=weightssum+c(k1)
-!            weightsnum=weightsnum+1
-          endif
-        enddo
-        do k1=1,np*np
-          if(x(k1)>minp(k))then
-            x(k1)=x(k1)+addmass/weightssum
-!           x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
-          endif
-        enddo
-      endif
+!             x(k1)=x(k1)+addmass/(c(k1)*weightsnum)
+            endif
+          enddo
+        endif
+      enddo!end of iteration
 
-
-   enddo!end of iteration
-
-   do k1=1,np*np
-      ptens(k1,k)=x(k1)
-   enddo
-
-  enddo
-
-  do k = 1, nlev
-    do k1=1,np*np
-      ptens(k1,k)=ptens(k1,k)*dpmass(k1,k)
+      do k1=1,np*np
+         ptens(k1,k)=x(k1)
+      enddo
     enddo
-  enddo
+
+    do k = 1, nlev
+      do k1=1,np*np
+        ptens(k1,k)=ptens(k1,k)*dpmass(k1,k)
+      enddo
+    enddo
 
   end subroutine limiter_optim_iter_full
 #endif

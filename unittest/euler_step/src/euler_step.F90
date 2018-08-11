@@ -29,7 +29,7 @@ implicit none
   real(kind=real_kind), dimension(np, np, nlev, qsize, nets:nete) :: Qtens_biharmonic
   real(kind=real_kind), pointer, dimension(:,:,:)                 :: DSSvar
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
-  integer :: ie, q, i, j, k, d
+  integer :: ie, q, i, j, k, d, l
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
   integer :: kptr
@@ -55,8 +55,8 @@ implicit none
       do k=1,nlev
         do j=1,np
           do i=1,np
-            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = ie * 1000000 + k * 100 + j * 10 + i + 0.2
-            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = ie * 1000000 + k * 100 + j * 10 + i + 0.1
+            elem(ie)%state%Qdp(i,j,k,q,n0_qdp) = 1!ie * 1000000 + k * 100 + j * 10 + i + 0.2
+            elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = 2!ie * 1000000 + k * 100 + j * 10 + i + 0.1
           enddo
         enddo
       enddo
@@ -67,8 +67,8 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%dp(i,j,k) =  (ie * 1000000 + k * 100 + j * 10 + i + 0.2)*2
-          elem(ie)%derived%divdp_proj(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i + 0.2
+          elem(ie)%derived%dp(i,j,k) = (ie * 1000000 + k * 100 + j * 10 + i)*2
+          elem(ie)%derived%divdp_proj(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i
         enddo
       enddo
     enddo
@@ -76,23 +76,47 @@ implicit none
 
   do ie = nets, nete
     do k = 1, nlev
-      do d = 1, 2
-        do j = 1, np
-          do i = 1, np
-            elem(ie)%derived%vn0(i,j,1,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2)
-            elem(ie)%derived%vn0(i,j,2,k) = (ie * 1000000 + k * 100 + j * 10 + i + 0.2)*2
-          enddo
+      do j = 1, np
+        do i = 1, np
+          elem(ie)%derived%vn0(i,j,1,k) = (ie * 1000000 + k * 100 + j * 10 + i)
+          elem(ie)%derived%vn0(i,j,2,k) = (ie * 1000000 + k * 100 + j * 10 + i)*2
         enddo
       enddo
     enddo
   enddo
 
+  do l = 1, np
+    do i = 1, np
+      deriv%Dvv(i, l) = 1
+    enddo
+  enddo
+
+  do ie = nets, nete
+    do j = 1, np
+      do i = 1, np
+        elem(ie)%Dinv(i, j, 1, 1) = 1
+        elem(ie)%Dinv(i, j, 2, 1) = 1
+        elem(ie)%Dinv(i, j, 1, 2) = 1
+        elem(ie)%Dinv(i, j, 2, 2) = 1
+      enddo
+    enddo
+  enddo
+
+  do ie = nets, nete
+    do j = 1, np
+      do i = 1, np
+        elem(ie)%metdet(i, j) = 1
+        elem(ie)%rmetdet(i, j) = 1
+      enddo
+    enddo
+  enddo
 
   call euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv , nets , nete , DSSopt , rhs_multiplier )
 end program main
 
 subroutine euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv , nets , nete , DSSopt , rhs_multiplier )
 use kinds , only: real_kind
+use physical_constants, only: rrearth
 use element_mod, only: element_t
 use dimensions_mod, only: np, npdg, nlev, qsize
 use hybvcoord_mod, only:hvcoord_t
@@ -118,6 +142,7 @@ implicit none
   real(kind=real_kind), dimension(np, np,    nlev                  ) :: dp, dp_star
   real(kind=real_kind), dimension(np, np,    nlev, qsize, nets:nete) :: Qtens_biharmonic
   real(kind=real_kind), dimension(np, np,    nlev,        nets:nete) :: dp_temp
+  real(kind=real_kind), dimension(np, np,    nlev, qsize, nets:nete) :: dp_star_temp
   real(kind=real_kind), dimension(np, np, 2, nlev, qsize, nets:nete) :: gradQ_temp
   real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmax
   real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmin
@@ -161,32 +186,45 @@ implicit none
 !#else
   external :: slave_euler_v
   type param_2d_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, vn0, dp_temp, gradQ_temp
-    real(kind=real_kind) :: dt
-    integer :: nets, nete, rhs_multiplier, qsize
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
+        , dp_star_temp, Dvv, Dinv, metdet, rmetdet
+    real(kind=real_kind) :: dt, rrearth
+    integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp
   end type param_2d_t
   type(param_2d_t) :: param_2d_s
   param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
-  param_2d_s%qdp_leap_ptr = loc(elem((nets+1)%state%Qdp(:,:,:,:,:))
+  param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
   param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+  param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
   param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
   param_2d_s%dp_temp = loc(dp_temp(:,:,:,:))
-  param_2d_s%gradQ_temp = loc(gradQ_temp(:,:,:,:,:,:))
+  param_2d_s%dp_star_temp = loc(dp_star_temp)
+  param_2d_s%Dvv = loc(deriv%Dvv)
+  param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
+  param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
+  param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
   param_2d_s%dt = dt
+  param_2d_s%rrearth = rrearth
   param_2d_s%nets = nets
   param_2d_s%nete = nete
   param_2d_s%rhs_multiplier = rhs_multiplier
   param_2d_s%qsize = qsize
+  param_2d_s%n0_qdp = n0_qdp
+  param_2d_s%np1_qdp = np1_qdp
+  call athread_init()
+  call athread_spawn(slave_euler_v, param_2d_s)
+  call athread_join()
 !#endif
 
-!#define PRINT_QTEN
+#if 1
+#define PRINT_QTEN
 #ifdef PRINT_QTEN
   do ie=nets,nete
     do q=1,qsize
       do k=1,nlev
         do j=1,np
           do i=1,np
-            print *, Qtens_biharmonic(i,j,k,q,ie)
+            print *, dp_star_temp(i,j,k,q,ie)
           enddo
         enddo
       enddo
@@ -206,6 +244,7 @@ implicit none
   kbeg = 1
   kend = nlev
   rhs_viss = 0
+#endif
 #endif
 
 end subroutine euler_step

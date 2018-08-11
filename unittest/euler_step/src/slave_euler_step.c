@@ -1,9 +1,9 @@
 #include <slave.h>
 #include "dma_macros.h"
-//#include "ldm_alloc.h"
+#include "ldm_alloc.h"
 #define NP 4
 #define NLEV 30
-#define UC 4         // a unit that divides nete by column direction
+#define UC 3         // a unit that divides nete by column direction
 #define UR 3         // a unit that divides qsize by row direcion
 #define NC 4
 #define NR 16
@@ -34,28 +34,8 @@ void slave_euler_step_(param_t *param_s) {
   volatile int id = athread_get_id(-1);
   volatile unsigned long get_reply, put_reply;
   volatile int cid, rid;
-  //get_row_id(rid);
-  //get_col_id(cid);
 	dma_init();
-	//ldm_alloc_init();
-
-	/*
-  long qdp_s_ptr = param_s->qdp_s_ptr;
-  long qdp_leap_ptr = param_s->qdp_leap_ptr;
-  long dp_s_ptr = param_s->dp_s_ptr;
-  long dp_leap_ptr = param_s->dp_leap_ptr;
-  long divdp_proj_s_ptr = param_s->divdp_proj_s_ptr;
-  long divdp_proj_leap_ptr = param_s->divdp_proj_leap_ptr;
-	long Qtens_biharmonic_ptr = param_s->Qtens_biharmonic;
-  double dt = param_s->dt;
-  int nets = param_s->nets;
-  int nete = param_s->nete;
-  int np1_qdp = param_s->np1_qdp;
-  int n0_qdp = param_s->n0_qdp;
-  int DSSopt = param_s->DSSopt;
-  int rhs_multiplier = param_s->rhs_multiplier;
-  int qsize = param_s->qsize;
-	*/
+	ldm_alloc_init();
 
 	param_t param_d;
 	pe_get(param_s, &param_d, sizeof(param_t));
@@ -87,9 +67,6 @@ void slave_euler_step_(param_t *param_s) {
 	double qmin_val[NLEV];
 	double qmax[UC*NLEV];
 	double qmin[UC*NLEV];
-	//double *qmax, *qmin;
-	//ldm_alloc(qmax, (nete - nets + 1)*qsize*NLEV);
-	//ldm_alloc(qmin, (nete - nets + 1)*qsize*NLEV);
 
   int slice_qdp = (int)((qdp_leap_ptr - qdp_s_ptr)/sizeof(double));  //stripe in ie axis of elem.state.Qdp
   double *src_np1_qdp = (double *)(qdp_s_ptr) + (np1_qdp - 1)*qsize*stripe_qdp;
@@ -134,13 +111,15 @@ void slave_euler_step_(param_t *param_s) {
         cend = c*NC*UC + (cid + 1)*UC;
         cend = cend < qsize ? cend : qsize;
         cn = cend - cbeg;
-        src_qdp_ptr = src_n0_qdp + (rbeg + ie)*slice_qdp + cbeg*stripe_qdp;
-				src_Qtens_bi_ptr = src_Qtens_bi + (rbeg + ie)*istep_Qten + cbeg*qstep_Qten;
-				src_qmax_ptr = src_qmax + (rbeg + ie)*istep_qmax + cbeg*qstep_qmax;
-				src_qmin_ptr = src_qmin + (rbeg + ie)*istep_qmax + cbeg*qstep_qmax;
         if (cn > 0) {
+          src_qdp_ptr = src_n0_qdp + (rbeg + ie)*slice_qdp + cbeg*stripe_qdp;
+          src_Qtens_bi_ptr = src_Qtens_bi + (rbeg + ie)*istep_Qten + cbeg*qstep_Qten;
+          src_qmax_ptr = src_qmax + (rbeg + ie)*istep_qmax + cbeg*qstep_qmax;
+          src_qmin_ptr = src_qmin + (rbeg + ie)*istep_qmax + cbeg*qstep_qmax;
           pe_get(src_qdp_ptr, Qdp, (block*sizeof(double)));
 					pe_get(src_Qtens_bi_ptr, Qtens_biharmonic_l, (block*sizeof(double)));
+          pe_get(src_qmax_ptr, qmax, cn*NLEV*sizeof(double));
+          pe_get(src_qmin_ptr, qmin, cn*NLEV*sizeof(double));
 					dma_syn();
 					for (q = 0; q < cn; q++) {
 						for (k = 0; k < NLEV; k++) {
@@ -155,14 +134,13 @@ void slave_euler_step_(param_t *param_s) {
 									qmax_val[k] = max(qmax_val[k], Qtens_biharmonic_l[pos_Qtens_bi]);
 								}
 							}
+              pos_qmax = q*NLEV + k;
 							if (rhs_multiplier == 1) {
-								pos_qmax = q*NLEV + k;
 								qmin[pos_qmax] = min(qmin[pos_qmax], qmin_val[k]);
-								qmin[pos_qmax] = max(qmin[pos_qmax], 0.0);
+								qmin[pos_qmax] = max(qmin[pos_qmax], 0);
 								qmax[pos_qmax] = max(qmax[pos_qmax], qmax_val[k]);
 							} else {
-								pos_qmax = q*NLEV + k;
-								qmin[pos_qmax] = max(qmin_val[k], 0.0);
+								qmin[pos_qmax] = max(qmin_val[k], 0);
 								qmax[pos_qmax] = qmax_val[k];
 							}
 						}
@@ -175,7 +153,4 @@ void slave_euler_step_(param_t *param_s) {
       }
     }
   }
-
-	//ldm_dealloc(qmax);
-	//ldm_dealloc(qmin);
 }

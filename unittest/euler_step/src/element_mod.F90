@@ -58,6 +58,12 @@ use dimensions_mod, only: np, nlev, nlevp, qsize_d, qsize
   type, public :: element_t
      type (elem_state_t) :: state
      type (derived_state_t)   :: derived
+     real (kind=real_kind)    :: met(np,np,2,2)                       ! metric tensor on velocity and pressure grid
+     real (kind=real_kind)    :: metinv(np,np,2,2)                    ! metric tensor on velocity and pressure grid
+     real (kind=real_kind)    :: metdet(np,np)                        ! g = SQRT(det(g_ij)) on velocity and pressure grid
+     real (kind=real_kind)    :: rmetdet(np,np)                       ! 1/metdet on velocity pressure grid
+     real (kind=real_kind)    :: D(np,np,2,2)                         ! Map covariant field on cube to vector field on the sphere
+     real (kind=real_kind)    :: Dinv(np,np,2,2)                      ! Map vector field
   end type element_t
 
 end module element_mod
