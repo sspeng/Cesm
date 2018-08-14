@@ -67,8 +67,10 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%dp(i,j,k) = (ie * 1000000 + k * 100 + j * 10 + i)*2
+          elem(ie)%derived%dp(i,j,k) = 1 !(ie * 1000000 + k * 100 + j * 10 + i)*2
           elem(ie)%derived%divdp_proj(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i
+          elem(ie)%derived%divdp(i,j,k) = 1 !ie * 1000000 + k * 100 + j * 10 + i
+          elem(ie)%derived%dpdiss_biharmonic(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i
         enddo
       enddo
     enddo
@@ -146,13 +148,17 @@ implicit none
   real(kind=real_kind), dimension(np, np, 2, nlev, qsize, nets:nete) :: gradQ_temp
   real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmax
   real(kind=real_kind), dimension(           nlev, qsize, nets:nete) :: qmin
+  real(kind=real_kind), dimension(np, np,    nlev, qsize, nets:nete) :: Qtens_temp
   real(kind=real_kind), pointer, dimension(:,:,:) :: DSSvar
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
 
   integer :: ie, q, i, j, k, d
+  integer :: limiter_option = 8
   integer :: rhs_viss = 0
   integer :: qbeg, qend, kbeg, kend
   integer :: kptr
+  real(kind=real_kind) :: nu_p = 0.0D5
+  real(kind=real_kind) :: nu_q = -1
   type(element_t) :: elem_test(43)
 
 !#define QMAX
@@ -187,9 +193,11 @@ implicit none
   external :: slave_euler_v
   type param_2d_t
     integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
-        , dp_star_temp, Dvv, Dinv, metdet, rmetdet
-    real(kind=real_kind) :: dt, rrearth
-    integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp
+        , dp_star_temp, Dvv, Dinv, metdet, rmetdet, Qtens_temp, Qtens_biharmonic \
+        , divdp, dpdiss_biharmonic, spheremp
+    real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
+    integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
+        , rhs_viss
   end type param_2d_t
   type(param_2d_t) :: param_2d_s
   param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
@@ -203,20 +211,29 @@ implicit none
   param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
   param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
   param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+  param_2d_s%Qtens_temp = loc(Qtens_temp)
+  param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+  param_2d_s%divdp = loc(elem(nets)%derived%divdp)
+  param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
+  param_2d_s%spheremp = loc(elem(nets)%spheremp)
   param_2d_s%dt = dt
   param_2d_s%rrearth = rrearth
+  param_2d_s%nu_p = nu_p
+  param_2d_s%nu_q = nu_q
   param_2d_s%nets = nets
   param_2d_s%nete = nete
   param_2d_s%rhs_multiplier = rhs_multiplier
   param_2d_s%qsize = qsize
   param_2d_s%n0_qdp = n0_qdp
   param_2d_s%np1_qdp = np1_qdp
+  param_2d_s%limiter_option = limiter_option
+  param_2d_s%rhs_viss = rhs_viss
   call athread_init()
   call athread_spawn(slave_euler_v, param_2d_s)
   call athread_join()
 !#endif
 
-#if 1
+#if 0
 #define PRINT_QTEN
 #ifdef PRINT_QTEN
   do ie=nets,nete
