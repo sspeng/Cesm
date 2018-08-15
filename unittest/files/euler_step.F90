@@ -316,8 +316,8 @@ do ie = nets , nete
 !            dpdiss(:,:) = ( hvcoord%hybi(k+1) - hvcoord%hybi(k) ) * elem(ie)%derived%psdiss_biharmonic(:,:)
          do j=1,np
             do i=1,np
-                dpdiss(i,j) = elem(ie)%derived%dpdiss_biharmonic(i,j,k)
-             dp_star(i,j,k) = dp_star(i,j,k) - rhs_viss * dt * nu_q * dpdiss(i,j) / elem(ie)%spheremp(i,j)
+              dpdiss(i,j) = elem(ie)%derived%dpdiss_biharmonic(i,j,k)
+              dp_star(i,j,k) = dp_star(i,j,k) - rhs_viss * dt * nu_q * dpdiss(i,j) / elem(ie)%spheremp(i,j)
             enddo
           enddo
         endif

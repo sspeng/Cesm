@@ -7,8 +7,8 @@
 #define DIR_VECTOR_ALIGNED DIR$ VECTOR ALIGNED
 #endif
 
-#define LIMITER_ORIGINAL 1
-!#define LIMITER_REWRITE_OPT 1
+!#define LIMITER_ORIGINAL 1
+#define LIMITER_REWRITE_OPT 1
 #define OVERLAP 1
 
 #if 0
@@ -1961,7 +1961,7 @@ external :: slave_euler_v
 type param_2d_t
   integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
       , dp_star_temp, Dvv, Dinv, metdet, rmetdet, Qtens_temp, Qtens_biharmonic \
-      , divdp, dpdiss_biharmonic, spheremp
+      , divdp, dpdiss_biharmonic, spheremp, qmax, qmin
   real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
   integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
       , rhs_viss
@@ -2216,6 +2216,8 @@ param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
 param_2d_s%divdp = loc(elem(nets)%derived%divdp)
 param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
 param_2d_s%spheremp = loc(elem(nets)%spheremp)
+param_2d_s%qmax = loc(qmax)
+param_2d_s%qmin = loc(qmin)
 param_2d_s%dt = dt
 param_2d_s%rrearth = rrearth
 param_2d_s%nu_p = nu_p
@@ -2328,11 +2330,6 @@ do ie = nets, nete
     endif
   enddo
 enddo
-call t_stopf('local_div')
-
-#endif
-
-
 
 do ie = nets, nete
   do q = 1, qsize
@@ -2346,7 +2343,9 @@ do ie = nets, nete
   enddo
 enddo
 
+call t_stopf('local_div')
 
+#endif
     ! apply mass matrix, overwrite np1 with solution:
     ! dont do this earlier, since we allow np1_qdp == n0_qdp
     ! and we dont want to overwrite n0_qdp until we are done using it
@@ -3083,7 +3082,7 @@ end subroutine euler_step
     real (kind=real_kind) :: al_neg(np*np), al_pos(np*np), howmuch
     real (kind=real_kind) :: tol_limiter = 1e-15
     integer, parameter :: maxiter = 5
-
+    call t_startf('LIMITER_ORIGINAL')
     do k = 1 , nlev
       weights(:,k) = sphweights(:) * dpmass(:,k)
       ptens(:,k) = ptens(:,k) / dpmass(:,k)
@@ -3213,6 +3212,7 @@ end subroutine euler_step
     do k = 1 , nlev
       ptens(:,k) = ptens(:,k) * dpmass(:,k)
     enddo
+    call t_stopf('LIMITER_ORIGINAL')
   end subroutine limiter_optim_iter_full
 #endif
 
@@ -3245,7 +3245,7 @@ end subroutine euler_step
     real (kind=real_kind) :: x(np*np),c(np*np)
     integer :: maxiter = np*np-1
     real (kind=real_kind) :: tol_limiter = 5e-14
-
+    call t_startf('LIMITER_REWRITE_OPT')
     do k = 1, nlev
 
      do k1=1,np*np
@@ -3328,7 +3328,7 @@ end subroutine euler_step
       ptens(k1,k)=ptens(k1,k)*dpmass(k1,k)
     enddo
   enddo
-
+  call t_stopf('LIMITER_REWRITE_OPT')
   end subroutine limiter_optim_iter_full
 #endif
 

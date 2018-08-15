@@ -194,7 +194,7 @@ implicit none
   type param_2d_t
     integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
         , dp_star_temp, Dvv, Dinv, metdet, rmetdet, Qtens_temp, Qtens_biharmonic \
-        , divdp, dpdiss_biharmonic, spheremp
+        , divdp, dpdiss_biharmonic, spheremp, qmax, qmin
     real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
     integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
         , rhs_viss
@@ -216,6 +216,8 @@ implicit none
   param_2d_s%divdp = loc(elem(nets)%derived%divdp)
   param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
   param_2d_s%spheremp = loc(elem(nets)%spheremp)
+  param_2d_s%qmax = loc(qmax)
+  param_2d_s%qmin = loc(qmin)
   param_2d_s%dt = dt
   param_2d_s%rrearth = rrearth
   param_2d_s%nu_p = nu_p

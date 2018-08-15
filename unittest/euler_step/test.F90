@@ -7,32 +7,58 @@ implicit none
   !c = min(a, b, m)
   !d = max(a, b, m)
   !print *, c, d
-  !integer :: i, j, k
-  !integer :: a(10, 10)
-  !do j = 1, 10
-  !  do i = 1, 10
-  !    a(i, j) = j * 10 + i
-  !  enddo
-  !enddo
-!
-  !do j = 1, 10
-  !  do i = 1, 10
-  !    if ((i>3) .and. (i<5)) CYCLE
-  !    !print *, a(i, j)
-  !    if (i>6) exit
-  !  enddo
-  !enddo
+  integer :: i, j, k
+  integer :: a(10, 10)
+  do j = 1, 10
+    do i = 1, 10
+      a(i, j) = j * 10 + i
+    enddo
+  enddo
+
+  do j = 1, 10
+    do i = 1, 10
+      if ((i>3) .and. (i<5)) CYCLE
+      print *, i, j, a(i, j)
+      if (i>6) exit
+    enddo
+  enddo
   !print *, 0D0
-  integer :: a(16), b(16), c(16)
-  integer :: i, j, k, sum_a = 0
-  do i = 1, 16
-    a(i) = 1
-    b(i) = 2
-  enddo
-  c = a*b
-  do i = 1, 16
-    print *, c(i)
-  enddo
-  sum_a = sum(a*b)
-  print *, sum_a
+  !integer :: a(16), b(16), c(16)
+  !integer :: i, j, k, sum_a = 0
+  !do i = 1, 16
+  !  a(i) = 3
+  !  b(i) = 5
+  !enddo
+  !c = a*b
+  !!do i = 1, 16
+  !!  print *, c(i)
+  !!enddo
+  !sum_a = sum(a*b)
+  !integer :: i, j, k
+  !real :: mass
+  !real :: cc(16), xx(16)
+  !real :: test(4, 4, 2)
+  !do i = 1, 16
+  !  cc(i) = 5
+  !  xx(i) = 5
+  !enddo
+  !mass = sum(cc*xx)
+  !print *, mass
+  !do k = 1, 2
+  !  do j = 1, 4
+  !    do i = 1, 4
+  !      test(i, j, k) = 1
+  !    enddo
+  !  enddo
+  !enddo
+  !call func(test)
 end program comp
+
+subroutine func(test)
+  real :: test(16*2)
+  integer :: i
+  do i = 1, 16*2
+    print *, test(i)
+  enddo
+
+end subroutine func

@@ -9,6 +9,23 @@
     sum = sum + array[i];  \
 }
 
+#define sum_array_multiply_1(sum, a, b, len, type) { \
+  int i;            \
+  type _array[len];    \
+  for (i = 0; i < len; i++) { \
+    _array[i] = a[i] * b[i];   \
+    sum = sum + _array[i]; \
+  }  \
+}
+
+#define sum_array_multiply(sum, a, b) { \
+  int i;  \
+  double _array[16];   \
+  for (i = 0; i < 16; i++) {  \
+    _array[i] = a[i] * b[i]; \
+    sum += _array[i];  \
+  } \
+}
 int main() {
   //double a, b, max, min;
   //a = 7.0f; b = 9.0f;
@@ -39,14 +56,29 @@ int main() {
   int test = -6;
   int i = 0;
   for (i = 0; i < 16; i++) {
-    a[i] = 1;
-    b[i] = 1;
+    a[i] = 3;
+    b[i] = 5;
   }
   for (i = 0; i < 16; i++) {
     sum_b = sum_b + b[i];
   }
-  test = abs(test);
+  //test = abs(test);
   sum(sum_a, a, 16);
-  printf("sum_a:%d, sum_b:%d, test_abs:%d\n", sum_a, sum_b, test);
+  for (i = 0; i < 16; i++) {
+    c[i] = a[i] * b[i];
+    sum_c = sum_c + c[i];
+  }
+  sum_c = 0;
+  int len = 16;
+  sum_array_multiply_1(sum_c, a, b, len, int);
+  double mass;
+  double cc[16], xx[16];
+  for (i = 0; i < 16; i++) {
+    cc[i] = 6;
+    xx[i] = 5;
+  }
+  sum_array_multiply(mass, cc, xx);
+
+  printf("sum_a:%d, sum_c:%d, mass:%lf\n", sum_a, sum_c, mass);
   return 0;
 }
