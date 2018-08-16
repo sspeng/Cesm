@@ -1959,11 +1959,11 @@ type(param_t) :: param_s
 
 external :: slave_euler_v
 type param_2d_t
-  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
-      , dp_star_temp, Dvv, Dinv, metdet, rmetdet, Qtens_temp, Qtens_biharmonic \
-      , divdp, dpdiss_biharmonic, spheremp, qmax, qmin
+  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv         \
+  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp      \
+  , qmax, qmin
   real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
-  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
+  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option\
       , rhs_viss
 end type param_2d_t
 type(param_2d_t) :: param_2d_s
@@ -2205,19 +2205,16 @@ param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
 param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
 param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
 param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
-param_2d_s%dp_temp = loc(dp_temp(:,:,:,:))
-param_2d_s%dp_star_temp = loc(dp_star_temp)
 param_2d_s%Dvv = loc(deriv%Dvv)
 param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
 param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
 param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
-param_2d_s%Qtens_temp = loc(Qtens_temp)
 param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
 param_2d_s%divdp = loc(elem(nets)%derived%divdp)
 param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
 param_2d_s%spheremp = loc(elem(nets)%spheremp)
-param_2d_s%qmax = loc(qmax(:,:,:))
-param_2d_s%qmin = loc(qmin(:,:,:))
+param_2d_s%qmax = loc(qmax)
+param_2d_s%qmin = loc(qmin)
 param_2d_s%dt = dt
 param_2d_s%rrearth = rrearth
 param_2d_s%nu_p = nu_p
@@ -2432,7 +2429,7 @@ enddo
 
 
 #define PRINT
-  !#undef PRINT
+#undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then

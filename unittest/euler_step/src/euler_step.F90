@@ -192,9 +192,9 @@ implicit none
 !#else
   external :: slave_euler_v
   type param_2d_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, dp_temp  \
-        , dp_star_temp, Dvv, Dinv, metdet, rmetdet, Qtens_temp, Qtens_biharmonic \
-        , divdp, dpdiss_biharmonic, spheremp, qmax, qmin
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
+    , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp    \
+    , qmax, qmin
     real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
     integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
         , rhs_viss
@@ -205,13 +205,10 @@ implicit none
   param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
   param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
   param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
-  param_2d_s%dp_temp = loc(dp_temp(:,:,:,:))
-  param_2d_s%dp_star_temp = loc(dp_star_temp)
   param_2d_s%Dvv = loc(deriv%Dvv)
   param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
   param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
   param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
-  param_2d_s%Qtens_temp = loc(Qtens_temp)
   param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
   param_2d_s%divdp = loc(elem(nets)%derived%divdp)
   param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
@@ -235,8 +232,8 @@ implicit none
   call athread_join()
 !#endif
 
-#if 0
-#define PRINT_QTEN
+#if 1
+!#define PRINT_QTEN
 #ifdef PRINT_QTEN
   do ie=nets,nete
     do q=1,qsize
