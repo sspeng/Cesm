@@ -7,7 +7,7 @@
 #define DIR_VECTOR_ALIGNED DIR$ VECTOR ALIGNED
 #endif
 
-!#define LIMITER_ORIGINAL 1
+!#define LIMITER_ORIGINAL 0
 #define LIMITER_REWRITE_OPT 1
 #define OVERLAP 1
 
@@ -2216,8 +2216,8 @@ param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
 param_2d_s%divdp = loc(elem(nets)%derived%divdp)
 param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
 param_2d_s%spheremp = loc(elem(nets)%spheremp)
-param_2d_s%qmax = loc(qmax)
-param_2d_s%qmin = loc(qmin)
+param_2d_s%qmax = loc(qmax(:,:,:))
+param_2d_s%qmin = loc(qmin(:,:,:))
 param_2d_s%dt = dt
 param_2d_s%rrearth = rrearth
 param_2d_s%nu_p = nu_p
@@ -2343,31 +2343,36 @@ do ie = nets, nete
   enddo
 enddo
 
+! apply mass matrix, overwrite np1 with solution:
+! dont do this earlier, since we allow np1_qdp == n0_qdp
+! and we dont want to overwrite n0_qdp until we are done using it
+do ie = nets, nete
+do q = 1, qsize
+do k = 1 , nlev
+  do j=1,np
+    do i=1,np
+      !elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens(i,j,k)
+      elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens_temp(i,j,k,q,ie)
+    enddo
+  enddo
+enddo
+
+if ( limiter_option == 4 ) then
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  ! sign-preserving limiter, applied after mass matrix
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
+endif
+enddo
+enddo
+
 call t_stopf('local_div')
 
 #endif
-    ! apply mass matrix, overwrite np1 with solution:
-    ! dont do this earlier, since we allow np1_qdp == n0_qdp
-    ! and we dont want to overwrite n0_qdp until we are done using it
-do ie = nets, nete
-  do q = 1, qsize
-    do k = 1 , nlev
-      do j=1,np
-        do i=1,np
-          !elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens(i,j,k)
-          elem(ie)%state%Qdp(i,j,k,q,np1_qdp) = elem(ie)%spheremp(i,j) * Qtens_temp(i,j,k,q,ie)
-        enddo
-      enddo
-    enddo
 
-    if ( limiter_option == 4 ) then
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-      ! sign-preserving limiter, applied after mass matrix
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-      call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
-    endif
-  enddo
-enddo
+
+
+
 
 do ie = nets, nete
   do q = 1, qsize
@@ -2773,7 +2778,9 @@ do ie = nets , nete
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
       ! sign-preserving limiter, applied after mass matrix
       !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+      call t_startf('limiter2d_zero')
       call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
+      call t_stopf('limiter2d_zero')
     endif
 
     kptr = nlev*(q-1)

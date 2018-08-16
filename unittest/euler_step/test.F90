@@ -7,21 +7,21 @@ implicit none
   !c = min(a, b, m)
   !d = max(a, b, m)
   !print *, c, d
-  integer :: i, j, k
-  integer :: a(10, 10)
-  do j = 1, 10
-    do i = 1, 10
-      a(i, j) = j * 10 + i
-    enddo
-  enddo
-
-  do j = 1, 10
-    do i = 1, 10
-      if ((i>3) .and. (i<5)) CYCLE
-      print *, i, j, a(i, j)
-      if (i>6) exit
-    enddo
-  enddo
+  !integer :: i, j, k
+  !integer :: a(10, 10)
+  !do j = 1, 10
+  !  do i = 1, 10
+  !    a(i, j) = j * 10 + i
+  !  enddo
+  !enddo
+!
+  !do j = 1, 10
+  !  do i = 1, 10
+  !    if ((i>3) .and. (i<5)) CYCLE
+  !    print *, i, j, a(i, j)
+  !    if (i>6) exit
+  !  enddo
+  !enddo
   !print *, 0D0
   !integer :: a(16), b(16), c(16)
   !integer :: i, j, k, sum_a = 0
@@ -52,6 +52,13 @@ implicit none
   !  enddo
   !enddo
   !call func(test)
+  !real :: a, b
+  !a = -3.0d0
+  !b = abs(a)
+  !print *, a, b
+  real(kind=8) :: a, b
+  a = a + 1
+  print *, a
 end program comp
 
 subroutine func(test)

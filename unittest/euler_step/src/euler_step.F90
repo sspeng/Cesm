@@ -68,9 +68,9 @@ implicit none
       do j = 1, np
         do i = 1, np
           elem(ie)%derived%dp(i,j,k) = 1 !(ie * 1000000 + k * 100 + j * 10 + i)*2
-          elem(ie)%derived%divdp_proj(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i
+          elem(ie)%derived%divdp_proj(i,j,k) = 1 ! ie * 1000000 + k * 100 + j * 10 + i
           elem(ie)%derived%divdp(i,j,k) = 1 !ie * 1000000 + k * 100 + j * 10 + i
-          elem(ie)%derived%dpdiss_biharmonic(i,j,k) =  ie * 1000000 + k * 100 + j * 10 + i
+          elem(ie)%derived%dpdiss_biharmonic(i,j,k) = 1! ie * 1000000 + k * 100 + j * 10 + i
         enddo
       enddo
     enddo
@@ -80,8 +80,8 @@ implicit none
     do k = 1, nlev
       do j = 1, np
         do i = 1, np
-          elem(ie)%derived%vn0(i,j,1,k) = (ie * 1000000 + k * 100 + j * 10 + i)
-          elem(ie)%derived%vn0(i,j,2,k) = (ie * 1000000 + k * 100 + j * 10 + i)*2
+          elem(ie)%derived%vn0(i,j,1,k) = 1!(ie * 1000000 + k * 100 + j * 10 + i)
+          elem(ie)%derived%vn0(i,j,2,k) = 1!(ie * 1000000 + k * 100 + j * 10 + i)*2
         enddo
       enddo
     enddo

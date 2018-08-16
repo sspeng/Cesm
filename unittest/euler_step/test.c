@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #define max(val1, val2) ((val1) > (val2) ? (val1) : (val2))
 #define min(val1, val2) ((val1) < (val2) ? (val1) : (val2))
-#define  abs(value) (__asm__ __volatile__ ("fcpys $31 , %0 , %0 " :  : "r"(va) ))
+#define abs(value, ret) asm volatile ("fcpys $31, %1, %0" : "=r"(ret) : "r"(value))
 #define sum(sum, array, len) {   \
   int i;   \
   for (i = 0; i < len; i++)     \
@@ -51,34 +51,37 @@ int main() {
   //  printf("\n");
   //}
   //return 0;
-  int sum_a = 0, sum_b = 0, sum_c = 0;
-  int a[16], b[16], c[16];
-  int test = -6;
-  int i = 0;
-  for (i = 0; i < 16; i++) {
-    a[i] = 3;
-    b[i] = 5;
-  }
-  for (i = 0; i < 16; i++) {
-    sum_b = sum_b + b[i];
-  }
-  //test = abs(test);
-  sum(sum_a, a, 16);
-  for (i = 0; i < 16; i++) {
-    c[i] = a[i] * b[i];
-    sum_c = sum_c + c[i];
-  }
-  sum_c = 0;
-  int len = 16;
-  sum_array_multiply_1(sum_c, a, b, len, int);
-  double mass;
-  double cc[16], xx[16];
-  for (i = 0; i < 16; i++) {
-    cc[i] = 6;
-    xx[i] = 5;
-  }
-  sum_array_multiply(mass, cc, xx);
-
-  printf("sum_a:%d, sum_c:%d, mass:%lf\n", sum_a, sum_c, mass);
+  //int sum_a = 0, sum_b = 0, sum_c = 0;
+  //int a[16], b[16], c[16];
+  //int test = -6;
+  //int i = 0;
+  //for (i = 0; i < 16; i++) {
+  //  a[i] = 3;
+  //  b[i] = 5;
+  //}
+  //for (i = 0; i < 16; i++) {
+  //  sum_b = sum_b + b[i];
+  //}
+  ////test = abs(test);
+  //sum(sum_a, a, 16);
+  //for (i = 0; i < 16; i++) {
+  //  c[i] = a[i] * b[i];
+  //  sum_c = sum_c + c[i];
+  //}
+  //sum_c = 0;
+  //int len = 16;
+  //sum_array_multiply_1(sum_c, a, b, len, int);
+  //double mass;
+  //double cc[16], xx[16];
+  //for (i = 0; i < 16; i++) {
+  //  cc[i] = 6;
+  //  xx[i] = 5;
+  //}
+  //sum_array_multiply(mass, cc, xx);
+//
+  //printf("sum_a:%d, sum_c:%d, mass:%lf\n", sum_a, sum_c, mass);
+  double a;
+  a = a + 1;
+  printf("a:%lf\n", a);
   return 0;
 }
