@@ -2429,7 +2429,7 @@ enddo
 
 
 #define PRINT
-#undef PRINT
+!#undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then

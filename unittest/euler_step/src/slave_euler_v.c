@@ -345,27 +345,19 @@ void slave_euler_v_(param_t *param_s) {
                   if (addmass_abs <= tol_limiter*mass_abs) break;
                   weightssum = 0.0;
                   if (addmass > 0) {
-                    for (k1 = 0; k1 < NP*NP; k1++) {
+                    for (k1 = 0; k1 < NP*NP; k1++)
                       if (xx[k1] < qmax[pos_qmax])
                         weightssum = weightssum + cc[k1];
-                    }
-
-                    for (k1 = 0; k1 < NP*NP; k1++) {
+                    for (k1 = 0; k1 < NP*NP; k1++)
                       if (xx[k1] < qmax[pos_qmax])
                         xx[k1] = xx[k1] + addmass/weightssum;
-                    }
-
                   } else {
-                    for (k1 = 0; k1 < NP*NP; k1++) {
+                    for (k1 = 0; k1 < NP*NP; k1++)
                       if (xx[k1] > qmin[pos_qmax])
                         weightssum = weightssum + cc[k1];
-                    }
-
-                    for (k1 = 0; k1 < NP*NP; k1++) {
+                    for (k1 = 0; k1 < NP*NP; k1++)
                       if (xx[k1] > qmin[pos_qmax])
                         xx[k1] = xx[k1] + addmass/weightssum;
-                    }
-
                   }
                 }  // end loop iter
                 for (k1 = 0; k1 < NP*NP; k1++) {
