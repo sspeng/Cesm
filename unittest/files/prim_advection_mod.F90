@@ -1968,6 +1968,8 @@ type param_2d_t
 end type param_2d_t
 type(param_2d_t) :: param_2d_s
 
+call t_startf('sw_euler_step')
+
 do k = 1 , nlev
   dp0(k) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
            ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*hvcoord%ps0
@@ -2022,8 +2024,8 @@ if ( limiter_option == 8  ) then
   !
   ! initialize dp, and compute Q from Qdp (and store Q in Qtens_biharmonic)
 
-#define QMAX_SW
-#ifdef QMAX_SW
+!#define SW_EULER_STEP
+#ifdef SW_EULER_STEP
 call t_startf('sw_qmax')
 param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
 param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
@@ -2099,7 +2101,9 @@ call t_stopf('local_qmax')
 
   if ( rhs_multiplier == 0 ) then
     ! update qmin/qmax based on neighbor data for lim8
+    call t_startf('neighbor_minmax')
     call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax')
   endif
 
   if ( rhs_multiplier == 2 ) then
@@ -2127,6 +2131,7 @@ call t_stopf('local_qmax')
       enddo
     endif
 #ifdef OVERLAP
+    call t_startf('neighbor_minmax_start_finish')
     call neighbor_minmax_start(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
     call biharmonic_wk_scalar(elem,qtens_biharmonic,deriv,edgeAdv,hybrid,nets,nete)
     do ie = nets, nete
@@ -2145,6 +2150,7 @@ call t_stopf('local_qmax')
       enddo
     enddo
     call neighbor_minmax_finish(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax_start_finish')
 #else
     call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
     call biharmonic_wk_scalar(elem,qtens_biharmonic,deriv,edgeAdv,hybrid,nets,nete)
@@ -2197,8 +2203,7 @@ do ie = nets , nete
   if ( DSSopt == DSSdiv_vdp_ave ) DSSvar => elem(ie)%derived%divdp_proj(:,:,:)
 enddo
 
-#define V_SW
-#ifdef V_SW
+#ifdef SW_EULER_STEP
 call t_startf('sw_div')
 param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
 param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
@@ -2368,9 +2373,7 @@ call t_stopf('local_div')
 #endif
 
 
-
-
-
+call t_startf('sw_edgePack')
 do ie = nets, nete
   do q = 1, qsize
     kptr = nlev*(q-1)
@@ -2423,13 +2426,15 @@ do ie = nets , nete
         enddo
       enddo
   enddo
-
 enddo
+
+call t_stopf('sw_edgePack')
 !   call t_stopf('euler_step')
 
+call t_stopf('sw_euler_step')
 
 #define PRINT
-!#undef PRINT
+#undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then
@@ -2501,6 +2506,8 @@ integer :: rhs_viss = 0
 integer :: qbeg, qend, kbeg, kend
 integer :: kptr
 
+call t_startf('local_euler_step')
+
 do k = 1 , nlev
   dp0(k) = ( hvcoord%hyai(k+1) - hvcoord%hyai(k) )*hvcoord%ps0 + &
            ( hvcoord%hybi(k+1) - hvcoord%hybi(k) )*hvcoord%ps0
@@ -2520,6 +2527,7 @@ return
 !   compute Q min/max values for lim8
 !   compute biharmonic mixing term f
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+call t_startf('locl_qmax')
 qbeg = 1
 qend = qsize
 kbeg = 1
@@ -2591,9 +2599,12 @@ if ( limiter_option == 8  ) then
     enddo
   enddo
 
+call t_stopf('locl_qmax')
   if ( rhs_multiplier == 0 ) then
     ! update qmin/qmax based on neighbor data for lim8
+    call t_startf('neighbor_minmax')
     call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax')
   endif
 
   if ( rhs_multiplier == 2 ) then
@@ -2621,6 +2632,7 @@ if ( limiter_option == 8  ) then
       enddo
     endif
 #ifdef OVERLAP
+    call t_startf('neighbor_minmax_start_finish')
     call neighbor_minmax_start(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
     call biharmonic_wk_scalar(elem,qtens_biharmonic,deriv,edgeAdv,hybrid,nets,nete)
     do ie = nets, nete
@@ -2639,6 +2651,7 @@ if ( limiter_option == 8  ) then
       enddo
     enddo
     call neighbor_minmax_finish(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax_start_finish')
 #else
     call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
     call biharmonic_wk_scalar(elem,qtens_biharmonic,deriv,edgeAdv,hybrid,nets,nete)
@@ -2837,8 +2850,10 @@ do ie = nets , nete
 enddo
 !   call t_stopf('euler_step')
 
+call t_stopf('local_euler_step')
+
 #define PRINT
-  !#undef PRINT
+#undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then

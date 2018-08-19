@@ -54,8 +54,8 @@
 }
 
 typedef struct {
-  double *gl_qdp, *gl_qdp_leap, *divdp_proj, *dp, *vn0, *Dvv, *Dinv, *metdet, \
-      *rmetdet, *Qtens_biharmonic, *divdp, *dpdiss_biharmonic,   \
+  double *gl_qdp, *gl_qdp_leap, *divdp_proj, *dp, *vn0, *Dvv, *Dinv, *metdet,  \
+      *rmetdet, *Qtens_biharmonic, *divdp, *dpdiss_biharmonic,                 \
       *spheremp, *qmax, *qmin;
   double dt, rrearth, nu_p, nu_q;
   int nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option       \
@@ -134,10 +134,10 @@ void slave_euler_v_(param_t *param_s) {
 
 #if 0
   if (id == 0) {
-    int size_tol = sizeof(double)*(block + block + block_dp + block_dp_star + block_vn0 \
-        + block_vn0 + block_dp + block_gradQ + NP*NP + 4*NP*NP + NP*NP + NP*NP  \
-        + block + block + block_dp + block_dp + NP*NP + NP*NP + NP*NP + NP*NP   \
-        + UC*NLEV + UC*NLEV + 6*NP*NP);
+    int size_tol = sizeof(double)*(block + block + block_dp + block_dp_star    \
+        + block_vn0 + block_vn0 + block_dp + block_gradQ + NP*NP + 4*NP*NP     \
+        + NP*NP + NP*NP + block + block + block_dp + block_dp + NP*NP          \
+        + NP*NP + NP*NP + NP*NP + UC*NLEV + UC*NLEV + 6*NP*NP);
     printf("size_tol:%dk\n", size_tol/1024);
   }
 #endif
