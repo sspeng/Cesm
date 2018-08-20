@@ -161,7 +161,11 @@ void slave_euler_v_(param_t *param_s) {
   double *gl_np1_qdp = gl_qdp + (np1_qdp - 1)*qsize*stripe_qdp;
 
   // Divide ie-axis data on the row cpe with loop_r
+  // the value of loop_r rely on NR, UR; NP is the number of cloumn cpe,
+  // UR is the unit that divides ie size by cloumn direcion,
   // Divide q-axis data on the cloumn cpe with loop_c
+  // same as loop_r, the loop_c rely on NC, UC
+  // UC is the unit that divides q size by row direction
   for (r = 0; r < loop_r; r++) {
     rbeg = r*NR*UR + rid*UR;
     rend = r*NR*UR + (rid + 1)*UR;
@@ -219,7 +223,7 @@ void slave_euler_v_(param_t *param_s) {
           pe_get(src_qmin, qmin, UC*NLEV*sizeof(double));
           dma_syn();
           for (q = 0; q < cn; q++) {
-            for (k = 0; k < NLEV; k++) {
+            for (k = 0; k < NLEV; k++) {  // start of divergence_sphere function
               for (j = 0; j < NP; j++) {
                 for (i = 0; i < NP; i++) {
                   int pos_qdp = q*NLEV*NP*NP + k*NP*NP + j*NP + i;
