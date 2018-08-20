@@ -5,9 +5,9 @@
 module viscosity_mod
 !
 !  This module should be renamed "global_deriv_mod.F90"
-! 
-!  It is a collection of derivative operators that must be applied to the field 
-!  over the sphere (as opposed to derivative operators that can be applied element 
+!
+!  It is a collection of derivative operators that must be applied to the field
+!  over the sphere (as opposed to derivative operators that can be applied element
 !  by element)
 !
 !
@@ -89,7 +89,7 @@ real (kind=real_kind), dimension(np,np,2) :: v
 real (kind=real_kind) ::  nu_ratio1,nu_ratio2
 logical var_coef1
 
-   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
    if(hypervis_scaling > 0)  var_coef1= .false.
@@ -115,13 +115,13 @@ logical var_coef1
 
 
    do ie=nets,nete
-      
+
 #ifdef _PRIM
       ! should filter lnps + PHI_s/RT?
       !pstens(:,:,ie)=laplace_sphere_wk(elem(ie)%state%ps_v(:,:,nt),deriv,elem(ie),var_coef=var_coef1)
       call laplace_sphere_wk(elem(ie)%state%ps_v(:,:,nt),deriv,elem(ie),pstens(:,:,ie),var_coef=var_coef1)
 #endif
-      
+
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(k, j, i)
 #endif
@@ -129,16 +129,16 @@ logical var_coef1
          do j=1,np
             do i=1,np
 #ifdef _PRIM
-               T(i,j,k)=elem(ie)%state%T(i,j,k,nt) 
+               T(i,j,k)=elem(ie)%state%T(i,j,k,nt)
 #elif defined _PRIMDG
                T(i,j,k)=elem(ie)%state%p(i,j,k,nt) + elem(ie)%state%phis(i,j)
-#else            
+#else
                ! filter surface height, not thickness
                T(i,j,k)=elem(ie)%state%p(i,j,k,nt) + elem(ie)%state%ps(i,j)
 #endif
             enddo
          enddo
-        
+
          !ptens(:,:,k,ie)=laplace_sphere_wk(T(:,:,k),deriv,elem(ie),var_coef=var_coef1)
          call laplace_sphere_wk(T(:,:,k),deriv,elem(ie),ptens(:,:,k,ie),var_coef=var_coef1)
          !vtens(:,:,:,k,ie)=vlaplace_sphere_wk(elem(ie)%state%v(:,:,:,k,nt),deriv,&
@@ -159,19 +159,19 @@ logical var_coef1
       call edgeVpack(edge3, pstens(:,:,ie),1,kptr,ie)
 #endif
    enddo
-   
+
    call bndry_exchangeV(hybrid,edge3)
-   
+
    do ie=nets,nete
       rspheremv     => elem(ie)%rspheremp(:,:)
-      
+
       kptr=0
       call edgeVunpack(edge3, ptens(:,:,:,ie), nlev, kptr, ie)
       kptr=nlev
       call edgeVunpack(edge3, vtens(:,:,1,:,ie), nlev, kptr, ie)
       kptr=2*nlev
       call edgeVunpack(edge3, vtens(:,:,1,:,ie), nlev, kptr, ie)
-      
+
       ! apply inverse mass matrix, then apply laplace again
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(k, j, i, v)
@@ -191,10 +191,10 @@ logical var_coef1
          call vlaplace_sphere_wk(v(:,:,:),deriv,elem(ie),vtens(:,:,:,k,ie),var_coef=.true.,&
               nu_ratio=nu_ratio2)
       enddo
-         
+
 #ifdef _PRIM
       kptr=3*nlev
-      call edgeVunpack(edge3, pstens(:,:,ie), 1, kptr,ie) 
+      call edgeVunpack(edge3, pstens(:,:,ie), 1, kptr,ie)
       ! apply inverse mass matrix, then apply laplace again
       lap_ps(:,:)=rspheremv(:,:)*pstens(:,:,ie)
       !pstens(:,:,ie)=laplace_sphere_wk(lap_ps,deriv,elem(ie),var_coef=.true.)
@@ -235,7 +235,7 @@ real (kind=real_kind), dimension(np,np,2) :: v
 real (kind=real_kind) :: nu_ratio1, nu_ratio2
 logical var_coef1
 
-   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
    if(hypervis_scaling > 0)    var_coef1 = .false.
@@ -266,10 +266,10 @@ logical var_coef1
 !$omp parallel do default(shared), private(k,tmp)
 #endif
       do k=1,nlev
-         tmp=elem(ie)%state%T(:,:,k,nt) 
+         tmp=elem(ie)%state%T(:,:,k,nt)
          !ptens(:,:,k,ie)=laplace_sphere_wk(tmp,deriv,elem(ie),var_coef=var_coef1)
          call laplace_sphere_wk(tmp,deriv,elem(ie),ptens(:,:,k,ie),var_coef=var_coef1)
-         tmp=elem(ie)%state%dp3d(:,:,k,nt) 
+         tmp=elem(ie)%state%dp3d(:,:,k,nt)
          !dptens(:,:,k,ie)=laplace_sphere_wk(tmp,deriv,elem(ie),var_coef=var_coef1)
          call laplace_sphere_wk(tmp,deriv,elem(ie),dptens(:,:,k,ie),var_coef=var_coef1)
          !vtens(:,:,:,k,ie)=vlaplace_sphere_wk(elem(ie)%state%v(:,:,:,k,nt),deriv,elem(ie),&
@@ -285,19 +285,19 @@ logical var_coef1
       call edgeVpack(edge3, dptens(1,1,1,ie),nlev,kptr,ie)
 
    enddo
-   
+
    call bndry_exchangeV(hybrid,edge3)
-   
+
    do ie=nets,nete
       rspheremv     => elem(ie)%rspheremp(:,:)
-      
+
       kptr=0
       call edgeVunpack(edge3, ptens(1,1,1,ie), nlev, kptr, ie)
       kptr=nlev
       call edgeVunpack(edge3, vtens(1,1,1,1,ie), 2*nlev, kptr, ie)
       kptr=3*nlev
       call edgeVunpack(edge3, dptens(1,1,1,ie), nlev, kptr, ie)
-      
+
       ! apply inverse mass matrix, then apply laplace again
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(k,v,tmp)
@@ -347,7 +347,7 @@ integer :: k,kptr,i,j,ie,ic,q
 real (kind=real_kind), dimension(np,np) :: lap_p
 logical var_coef1
 
-   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
    if(hypervis_scaling > 0)    var_coef1 = .false.
@@ -355,24 +355,24 @@ logical var_coef1
 
 
    do ie=nets,nete
-      do q=1,qsize      
+      do q=1,qsize
          do k=1,nlev    !  Potential loop inversion (AAM)
             lap_p(:,:)=qtens(:,:,k,q,ie)
 ! Original use of qtens on left and right hand sides caused OpenMP errors (AAM)
            !qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=var_coef1)
            call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=var_coef1)
          enddo
-         kptr = nlev*(q-1) 
+         kptr = nlev*(q-1)
          call edgeVpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
       enddo
    enddo
 
    call bndry_exchangeV(hybrid,edgeq)
-   
+
    do ie=nets,nete
       ! apply inverse mass matrix, then apply laplace again
-      do q=1,qsize      
-        kptr = nlev*(q-1) 
+      do q=1,qsize
+        kptr = nlev*(q-1)
         call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
         do k=1,nlev    !  Potential loop inversion (AAM)
            lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
@@ -395,7 +395,7 @@ subroutine biharmonic_wk_scalar_minmax(elem,qtens,deriv,edgeq,edgeminmax,hybrid,
 !    input:  qtens = Q
 !    output: qtens = weak biharmonic of Q and Q element min/max
 !
-!    note: emin/emax must be initialized with Q element min/max.  
+!    note: emin/emax must be initialized with Q element min/max.
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 type (hybrid_t)      , intent(in) :: hybrid
@@ -414,7 +414,7 @@ real (kind=real_kind) :: Qmin(np,np,nlev,qsize)
 real (kind=real_kind) :: Qmax(np,np,nlev,qsize)
 logical var_coef1
 
-   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad) 
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
    !so tensor is only used on second call to laplace_sphere_wk
    var_coef1 = .true.
    if(hypervis_scaling > 0)    var_coef1 = .false.
@@ -425,7 +425,7 @@ logical var_coef1
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(k, q, lap_p)
 #endif
-      do q=1,qsize      
+      do q=1,qsize
       do k=1,nlev    !  Potential loop inversion (AAM)
          Qmin(:,:,k,q)=emin(k,q,ie)  ! need to set all values in element for
          Qmax(:,:,k,q)=emax(k,q,ie)  ! edgeVpack routine below
@@ -439,11 +439,11 @@ logical var_coef1
       call edgeVpack(edgeq,Qmin,nlev*qsize,nlev*qsize,ie)
       call edgeVpack(edgeq,Qmax,nlev*qsize,2*nlev*qsize,ie)
    enddo
-   
+
    call bndry_exchangeV(hybrid,edgeq)
-   
+
    do ie=nets,nete
-      do q=1,qsize      
+      do q=1,qsize
       do k=1,nlev
          Qmin(:,:,k,q)=emin(k,q,ie)  ! restore element data.  we could avoid
          Qmax(:,:,k,q)=emax(k,q,ie)  ! this by adding a "ie" index to Qmin/max
@@ -458,7 +458,7 @@ logical var_coef1
 #if (defined COLUMN_OPENMP)
 !$omp parallel do private(k, q, lap_p)
 #endif
-      do q=1,qsize      
+      do q=1,qsize
         do k=1,nlev    !  Potential loop inversion (AAM)
            lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
            ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
@@ -489,7 +489,7 @@ end subroutine
 
 subroutine make_C0(zeta,elem,hybrid,nets,nete)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! apply DSS (aka assembly procedure) to zeta.  
+! apply DSS (aka assembly procedure) to zeta.
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
 type (hybrid_t)      , intent(in) :: hybrid
@@ -530,7 +530,7 @@ enddo
 #endif
 #endif
 
-call FreeEdgeBuffer(edge1) 
+call FreeEdgeBuffer(edge1)
 end subroutine
 
 
@@ -576,7 +576,7 @@ enddo
 #endif
 #endif
 
-call FreeEdgeBuffer(edge2) 
+call FreeEdgeBuffer(edge2)
 end subroutine
 
 
@@ -586,11 +586,11 @@ end subroutine
 
 subroutine compute_zeta_C0_contra(zeta,elem,hybrid,nets,nete,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 vorticity.  That is, solve:  
+! compute C0 vorticity.  That is, solve:
 !     < PHI, zeta > = <PHI, curl(elem%state%v >
 !
 !    input:  v (stored in elem()%, in contra-variant coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -627,11 +627,11 @@ end subroutine
 
 subroutine compute_div_C0_contra(zeta,elem,hybrid,nets,nete,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 divergence. That is, solve:  
+! compute C0 divergence. That is, solve:
 !     < PHI, zeta > = <PHI, div(elem%state%v >
 !
 !    input:  v (stored in elem()%, in contra-variant coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -666,11 +666,11 @@ end subroutine
 
 subroutine compute_zeta_C0_par(zeta,elem,par,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 vorticity.  That is, solve:  
+! compute C0 vorticity.  That is, solve:
 !     < PHI, zeta > = <PHI, curl(elem%state%v >
 !
 !    input:  v (stored in elem()%, in lat-lon coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 type (parallel_t) :: par
@@ -694,11 +694,11 @@ end subroutine
 
 subroutine compute_div_C0_par(zeta,elem,par,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 divergence. That is, solve:  
+! compute C0 divergence. That is, solve:
 !     < PHI, zeta > = <PHI, div(elem%state%v >
 !
 !    input:  v (stored in elem()%, in lat-lon coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -724,11 +724,11 @@ end subroutine
 
 subroutine compute_zeta_C0_hybrid(zeta,elem,hybrid,nets,nete,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 vorticity.  That is, solve:  
+! compute C0 vorticity.  That is, solve:
 !     < PHI, zeta > = <PHI, curl(elem%state%v >
 !
 !    input:  v (stored in elem()%, in lat-lon coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -761,11 +761,11 @@ end subroutine
 
 subroutine compute_div_C0_hybrid(zeta,elem,hybrid,nets,nete,nt)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-! compute C0 divergence. That is, solve:  
+! compute C0 divergence. That is, solve:
 !     < PHI, zeta > = <PHI, div(elem%state%v >
 !
 !    input:  v (stored in elem()%, in lat-lon coordinates)
-!    output: zeta(:,:,:,:)   
+!    output: zeta(:,:,:,:)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -839,7 +839,7 @@ integer :: kblk,qblk,kptr
       do q=1,qsize
          kptr = nlev*(q - 1)
          call  edgeSunpackMIN(edgeMinMax,min_neigh(:,q,ie),kblk,kptr,ie)
-         kptr = qsize*nlev + nlev*(q - 1) 
+         kptr = qsize*nlev + nlev*(q - 1)
          call  edgeSunpackMAX(edgeMinMax,max_neigh(:,q,ie),kblk,kptr,ie)
          do k=1,nlev
             min_neigh(k,q,ie) = max(min_neigh(k,q,ie),0d0)
@@ -860,9 +860,9 @@ subroutine neighbor_minmax_start(hybrid,edgeMinMax,nets,nete,min_neigh,max_neigh
    integer :: kblk, qblk
    integer :: kbeg, kend, qbeg, qend
 
-   ! local 
+   ! local
    integer :: ie,q, k,kptr
-   
+
 
    !call get_loop_ranges(hybrid,kbeg=kbeg,kend=kend,qbeg=qbeg,qend=qend)
    kbeg = 1
@@ -966,7 +966,7 @@ integer :: ie,k,q
     ! compute p min, max
     do ie=nets,nete
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
        do k=1,nlev
           Qmin(:,:,k)=minval(elem(ie)%state%p(:,:,k,nt))
@@ -984,7 +984,7 @@ integer :: ie,k,q
 
     do ie=nets,nete
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
        do k=1,nlev
           Qmin(:,:,k)=minval(elem(ie)%state%p(:,:,k,nt))
@@ -994,7 +994,7 @@ integer :: ie,k,q
        ! now unpack the min
        if (present(min_var)) then
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
           do k=1,nlev
              Qvar(:,:,k)=Qmax(1,1,k)-Qmin(1,1,k)
@@ -1002,7 +1002,7 @@ integer :: ie,k,q
 ! WARNING - edgeVunpackMin/Max take second argument as input/ouput
           call edgeVunpackMin(edgebuf,Qvar,nlev,2*nlev,ie)
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
           do k=1,nlev
              min_var(k,ie)=minval(Qvar(:,:,k))
@@ -1012,7 +1012,7 @@ integer :: ie,k,q
        ! now unpack the max
        if (present(max_var)) then
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
           do k=1,nlev
              Qvar(:,:,k)=Qmax(1,1,k)-Qmin(1,1,k)
@@ -1020,7 +1020,7 @@ integer :: ie,k,q
 ! WARNING - edgeVunpackMin/Max take second argument as input/ouput
           call edgeVunpackMax(edgebuf,Qvar,nlev,2*nlev,ie)
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
           do k=1,nlev
              max_var(k,ie)=maxval(Qvar(:,:,k))
@@ -1032,7 +1032,7 @@ integer :: ie,k,q
        call edgeVunpackMax(edgebuf,Qmax,nlev,0,ie)
        call edgeVunpackMin(edgebuf,Qmin,nlev,nlev,ie)
 #if (defined _LOOP_OPENMP)
-!$omp parallel do num_threads(vert_num_threads) 
+!$omp parallel do num_threads(vert_num_threads)
 #endif
        do k=1,nlev
           max_neigh(k,ie)=maxval(Qmax(:,:,k))
@@ -1092,7 +1092,7 @@ end subroutine
     ! ---------------------
     use kinds, only : real_kind
     ! ---------------------
-    use physical_constants, only : rearth 
+    use physical_constants, only : rearth
     ! ---------------------
     use dimensions_mod, only : np, nlev
     ! ---------------------
@@ -1138,8 +1138,8 @@ end subroutine
     real (kind=real_kind), dimension(np,np,2)      :: grade
     real (kind=real_kind), dimension(np,np,2)      :: grade2
     real (kind=real_kind), dimension(np,np)      :: vor
-    real (kind=real_kind), dimension(np,np)      :: div  
-    real (kind=real_kind), dimension(np,np)      :: wdiv  
+    real (kind=real_kind), dimension(np,np)      :: div
+    real (kind=real_kind), dimension(np,np)      :: wdiv
 
     real (kind=real_kind) ::  v1,v2,v3
 
@@ -1165,7 +1165,7 @@ end subroutine
 
     write(iulog,'(a,3i4,2e20.10)') 'carinal function:  ',iie,ii,jj
 
-    ! construct two global cardinal functions  pv and E    
+    ! construct two global cardinal functions  pv and E
     do ie=nets,nete
        do j=1,np
           do i=1,np
@@ -1180,7 +1180,7 @@ end subroutine
              if (ie==1 .and. i==2 .and. j==1) E(i,j,ie)=1
              if (ie==1 .and. i==3 .and. j==3) E(i,j,ie)=1
 #endif
-             
+
              ! delta function in contra coordinates
              v1     = 0
              v2     = 0
@@ -1188,21 +1188,21 @@ end subroutine
                 !v1=rearth
                 v2=rearth
              endif
-             
+
              ulatlon(i,j,1)=elem(ie)%D(1,1,i,j)*v1 + elem(ie)%D(1,2,i,j)*v2   ! contra->latlon
              ulatlon(i,j,2)=elem(ie)%D(2,1,i,j)*v1 + elem(ie)%D(2,2,i,j)*v2   ! contra->latlon
              pv(i,j,1,ie) = ulatlon(i,j,1)
              pv(i,j,2,ie) = ulatlon(i,j,2)
-             
+
           end do
        end do
     enddo
     call make_C0(E,elem,hybrid,nets,nete)
-    call make_C0_vector(pv,elem,hybrid,nets,nete) 
+    call make_C0_vector(pv,elem,hybrid,nets,nete)
 
 
 #ifdef CURLGRAD_TEST
-    ! check curl(grad(E)) 
+    ! check curl(grad(E))
     do ie=nets,nete
        if ( maxval(abs(E(:,:,ie))) > 0 ) then
        !write(iulog,'(a,i4,2e20.10)') 'maxval: E =',ie,maxval(E(:,:,ie))
@@ -1223,7 +1223,7 @@ end subroutine
        endif
     enddo
 
-    ! check div(curl(E)) with DSS 
+    ! check div(curl(E)) with DSS
     do ie=nets,nete
        ! gradbig(:,:,:,ie)=curl_sphere(E(:,:,ie),deriv,elem(ie))
        call curl_sphere(E(:,:,ie),deriv,elem(ie),gradbig(:,:,:,ie))
@@ -1241,7 +1241,7 @@ end subroutine
     enddo
 
 
-    ! check curl(grad(E)) with DSS 
+    ! check curl(grad(E)) with DSS
     do ie=nets,nete
        ! gradbig(:,:,:,ie)=gradient_sphere(E(:,:,ie),deriv,elem(ie)%Dinv)
        call gradient_sphere(E(:,:,ie),deriv,elem(ie)%Dinv,gradbig(:,:,:,ie))
@@ -1252,7 +1252,7 @@ end subroutine
        call vorticity_sphere(gradbig(:,:,:,ie),deriv,elem(ie),divbig(:,:,ie))
     enddo
     call make_C0(divbig,elem,hybrid,nets,nete)
-    
+
     do ie=nets,nete
        if (maxval(abs(divbig(:,:,ie)))*rearth**2 > .8e-12) then
           write(iulog,'(a,i4,2e20.10)') 'maxval: [curl([gradl])]=',ie,maxval(abs(divbig(:,:,ie)))*rearth**2
@@ -1267,12 +1267,12 @@ end subroutine
     do ie=nets,nete
        spheremv     => elem(ie)%spheremp(:,:)
 
-       ! div = divergence_sphere(pv(1,1,1,ie),deriv,elem(ie))      ! latlon vector -> scalar 
-       call divergence_sphere(pv(1,1,1,ie),deriv,elem(ie),div)      ! latlon vector -> scalar 
+       ! div = divergence_sphere(pv(1,1,1,ie),deriv,elem(ie))      ! latlon vector -> scalar
+       call divergence_sphere(pv(1,1,1,ie),deriv,elem(ie),div)      ! latlon vector -> scalar
        !grade = gradient_sphere(E(1,1,ie),deriv,elem(ie)%Dinv)
        call gradient_sphere(E(1,1,ie),deriv,elem(ie)%Dinv,grade)
-       !wdiv = divergence_sphere_wk(pv(1,1,1,ie),deriv,elem(ie)) 
-       call divergence_sphere_wk(pv(1,1,1,ie),deriv,elem(ie),wdiv) 
+       !wdiv = divergence_sphere_wk(pv(1,1,1,ie),deriv,elem(ie))
+       call divergence_sphere_wk(pv(1,1,1,ie),deriv,elem(ie),wdiv)
 
 
 
@@ -1296,7 +1296,7 @@ end subroutine
     call make_C0(divbig,elem,hybrid,nets,nete)
     call make_C0(wdivbig,elem,hybrid,nets,nete)
 
-    
+
 !!$    v1=global_integral(elem,ptens,hybrid,np,nets,nete)
 !!$    v3=global_integral(elem,ptens3,hybrid,np,nets,nete)
 !!$    print *,'< E div(pv) >   =',v1
@@ -1323,7 +1323,7 @@ end subroutine
                 if ( E(i,j,ie)/=0 ) then
 !                   write(iulog,'(3i3,4e22.14)') ie,i,j,div(i,j),wdiv(i,j),div(i,j)-wdiv(i,j),E(i,j,ie)
                 endif
-                
+
              end do
           end do
 
@@ -1363,11 +1363,11 @@ end subroutine
 !       where PHI = the delta function at (i,j)
 !
 !*****
-!  2. grad and weak grad are adjoints: 
+!  2. grad and weak grad are adjoints:
 !     weak gradient is defined with CONTRA vector test functions
-!     i.e. it returns vector:   [  integral[ p div(PHIcontra_1) ]       
-!                               [  integral[ p div(PHIcontra_2) ]       
-!     
+!     i.e. it returns vector:   [  integral[ p div(PHIcontra_1) ]
+!                               [  integral[ p div(PHIcontra_2) ]
+!
 !   integral[  p div(u) ] + integral[ grad(p) dot u ] = boundary_integral[ p u dot n]
 ! take u = PHIcontra_1 = (1,0) vector delta funciton at (i,j):
 !  -grad_wk(p)_1(i,j) + spheremp PHIcontra_1 dot grad(p) = boundary_integral[ PHIcontra_1 p]
@@ -1380,14 +1380,14 @@ end subroutine
 !
 ! HOMME-SE works in latlon, so convert cov->lat/lon:
 !
-! -grad_wk(p) + spheremp grad(p) = D^-t * B 
+! -grad_wk(p) + spheremp grad(p) = D^-t * B
 !
 ! with
-!    B1 = boundary_integral[ PHIcontra_1 p] 
+!    B1 = boundary_integral[ PHIcontra_1 p]
 !    B2 = boundary_integral[ PHIcontra_2 p]
 !
 !*****
-! 3.  weak grid with COVARIANT test functions! 
+! 3.  weak grid with COVARIANT test functions!
 !   integral[  p div(u) ] + integral[ grad(p) dot u ] = boundary_integral[ p u dot n]
 ! take u = PHIcov_1 = (1,0) vector delta funciton at (i,j):
 !  -grad_wk(p)_1(i,j) + spheremp PHIcov_1 dot grad(p) = boundary_integral[ PHIcov_1 p]
@@ -1400,14 +1400,14 @@ end subroutine
 !
 ! HOMME-SE works in latlon, so convert contra ->lat/lon:
 !
-! -grad_wk(p) + spheremp grad(p) = D * B 
+! -grad_wk(p) + spheremp grad(p) = D * B
 !
 ! with
-!    B1 = boundary_integral[ PHIcov_1 p] 
+!    B1 = boundary_integral[ PHIcov_1 p]
 !    B2 = boundary_integral[ PHIcov_2 p]
 !
 !*****
-! 4.  weak curl with COVARIANT test functions! 
+! 4.  weak curl with COVARIANT test functions!
 !  integral[ u dot curl(v)] - integral[v dot curl(u)] = boundary_integral[ v cross u dot n]
 !  curl(p) = curl(p*khat) = horizontal vector
 !  vor(U) =  s*khat       = (which we treat as a scalar)
@@ -1424,10 +1424,10 @@ end subroutine
 !
 ! HOMME-SE works in latlon, so convert contra ->lat/lon:
 !
-! curl_wk(p) + spheremp curl(p) = D * B 
+! curl_wk(p) + spheremp curl(p) = D * B
 !
 ! with
-!    B1 = boundary_integral[ PHIcov_1 p] 
+!    B1 = boundary_integral[ PHIcov_1 p]
 !    B2 = boundary_integral[ PHIcov_2 p]
 !
   use dimensions_mod, only : np, np, nlev
@@ -1439,11 +1439,11 @@ end subroutine
   use physical_constants, only : rrearth
 
   implicit none
-  
+
   type (element_t)     , intent(inout), target :: elem(:)
   type (derivative_t)  , intent(in) :: deriv
   integer :: nets,nete
-  ! local 
+  ! local
   real (kind=real_kind), dimension(np,np,2) :: ucontra,ulatlon,gradp,gradp_wk,ucov
   real (kind=real_kind), dimension(np,np) :: phidivu,ugradphi,rhs,lhs,p
   real (kind=real_kind), dimension(np,np) :: rhs2,lhs2
@@ -1465,10 +1465,10 @@ end subroutine
      ! ugradphi = divergence_sphere_wk(ulatlon,deriv,elem(ie))
      call divergence_sphere_wk(ulatlon,deriv,elem(ie),ugradphi)
      lhs = phidivu - ugradphi
-     
+
      rhs = element_boundary_integral(ulatlon,deriv,elem(ie))
-     
-     
+
+
      do j=1,np
         do i=1,np
            if ( abs(lhs(i,j)-rhs(i,j)) .gt. 1d-20) then
@@ -1482,20 +1482,20 @@ end subroutine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   print *,'check grad/weak grad (gradient_sphere_wk_testcontra)'
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! PHIVEC = contra cardinal function 
+  ! PHIVEC = contra cardinal function
   !          check each contra component seperately
 
   do ie=nets,nete
      call random_number(p)
-     
+
      ! grad(p)  (lat/lon vector)
      !gradp = gradient_sphere(p,deriv,elem(ie)%Dinv)
      call gradient_sphere(p,deriv,elem(ie)%Dinv,gradp)
-     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)  
+     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)
      gradp(:,:,2)=gradp(:,:,2)*elem(ie)%spheremp(:,:)
      !gradp_wk = gradient_sphere_wk_testcontra(p,deriv,elem(ie))
      call gradient_sphere_wk_testcontra(p,deriv,elem(ie),gradp_wk)
-     
+
      ucontra(:,:,1)=p  ! PHIvec_1 * p
      ucontra(:,:,2)=0
      ! contra->latlon
@@ -1511,7 +1511,7 @@ end subroutine
      ulatlon(:,:,1)=(elem(ie)%D(:,:,1,1)*ucontra(:,:,1) + elem(ie)%D(:,:,1,2)*ucontra(:,:,2))
      ulatlon(:,:,2)=(elem(ie)%D(:,:,2,1)*ucontra(:,:,1) + elem(ie)%D(:,:,2,2)*ucontra(:,:,2))
      rhs2 = element_boundary_integral(ulatlon,deriv,elem(ie))
-     lhs2 = gradp(:,:,2)-gradp_wk(:,:,2)  
+     lhs2 = gradp(:,:,2)-gradp_wk(:,:,2)
 
 
      ! boundary integral gives covariant components. (see above) convert to latlon:
@@ -1549,17 +1549,17 @@ end subroutine
   do ie=nets,nete
      call random_number(p)
 
-     
+
      ! grad(p)  (lat/lon vector)
      !gradp = gradient_sphere(p,deriv,elem(ie)%Dinv)
      call gradient_sphere(p,deriv,elem(ie)%Dinv,gradp)
-     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)  
+     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)
      gradp(:,:,2)=gradp(:,:,2)*elem(ie)%spheremp(:,:)
      ! gradp_wk = gradient_sphere_wk_testcov(p,deriv,elem(ie))
      call gradient_sphere_wk_testcov(p,deriv,elem(ie),gradp_wk)
      lhs = gradp(:,:,1)-gradp_wk(:,:,1)
-     lhs2 = gradp(:,:,2)-gradp_wk(:,:,2)  
-     
+     lhs2 = gradp(:,:,2)-gradp_wk(:,:,2)
+
      ucov(:,:,1)=p  ! PHIvec_1 * p
      ucov(:,:,2)=0
      ! cov->latlon
@@ -1607,17 +1607,17 @@ end subroutine
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   do ie=nets,nete
      call random_number(p)
-     
+
      ! grad(p)  (lat/lon vector)
      ! gradp = curl_sphere(p,deriv,elem(ie))
      call curl_sphere(p,deriv,elem(ie),gradp)
-     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)  
+     gradp(:,:,1)=gradp(:,:,1)*elem(ie)%spheremp(:,:)
      gradp(:,:,2)=gradp(:,:,2)*elem(ie)%spheremp(:,:)
      ! gradp_wk = curl_sphere_wk_testcov(p,deriv,elem(ie))
      call curl_sphere_wk_testcov(p,deriv,elem(ie),gradp_wk)
      lhs =  gradp_wk(:,:,1)-gradp(:,:,1)
      lhs2 = gradp_wk(:,:,2)-gradp(:,:,2)
-     
+
      ucov(:,:,1)=p  ! PHIvec_1 * p
      ucov(:,:,2)=0
      ! cov->latlon, and then u cross khat:

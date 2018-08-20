@@ -2107,6 +2107,7 @@ call t_stopf('local_qmax')
   endif
 
   if ( rhs_multiplier == 2 ) then
+    call t_startf('rhs_multiplier')
      rhs_viss = 3
     ! two scalings depending on nu_p:
     ! nu_p=0:    qtens_biharmonic *= dp0                   (apply viscsoity only to q)
@@ -2130,10 +2131,16 @@ call t_stopf('local_qmax')
         enddo
       enddo
     endif
+    call t_stopf('rhs_multiplier')
 #ifdef OVERLAP
     call t_startf('neighbor_minmax_start_finish')
+    call t_startf('neighbor_minmax_start')
     call neighbor_minmax_start(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax_start')
+    call t_startf('neighbor_wk_scalar')
     call biharmonic_wk_scalar(elem,qtens_biharmonic,deriv,edgeAdv,hybrid,nets,nete)
+    call t_stopf('neighbor_wk_scalar')
+    call t_startf('neighbor_compute')
     do ie = nets, nete
       do q = 1, qsize
         do k = 1, nlev
@@ -2149,7 +2156,10 @@ call t_stopf('local_qmax')
         enddo
       enddo
     enddo
+    call t_stopf('neighbor_compute')
+    call t_startf('neighbor_minmax_finish')
     call neighbor_minmax_finish(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
+    call t_stopf('neighbor_minmax_finish')
     call t_stopf('neighbor_minmax_start_finish')
 #else
     call neighbor_minmax(hybrid,edgeAdvQminmax,nets,nete,qmin(:,:,nets:nete),qmax(:,:,nets:nete))
