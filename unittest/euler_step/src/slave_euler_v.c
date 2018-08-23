@@ -20,7 +20,7 @@
 #define block_vn0         (NLEV*2*NP*NP)
 #define block_gradQ       (2*NP*NP)
 #define block_dp_star     (NLEV*NP*NP)
-#define block_Qtens     (NLEV*NP*NP)
+#define block_Qtens       (NLEV*NP*NP)
 #define block_Dinv        (2*2*NP*NP)
 #define block_det         (NP*NP)
 

@@ -56,9 +56,29 @@ implicit none
   !a = -3.0d0
   !b = abs(a)
   !print *, a, b
-  real(kind=8) :: a, b
-  a = a + 1
-  print *, a
+  !real(kind=8) :: a, b
+  !a = a + 1
+  !print *, a
+  integer :: i, j, k
+  integer :: a(4, 4, 8), b(4, 4, 8), c(4,4)
+  do k = 1, 8
+    do j = 1, 4
+      do i = 1, 4
+        a(i,j,k) = 1
+        b(i,j,k) = 1
+      enddo
+    enddo
+  enddo
+  do j = 1, 4
+    do i = 1, 4
+      c(i,j) = sum(a(i,j,:)*b(i,j,:))
+    enddo
+  enddo
+  do j = 1, 4
+    do i = 1, 4
+      print *, c(i, j)
+    enddo
+  enddo
 end program comp
 
 subroutine func(test)

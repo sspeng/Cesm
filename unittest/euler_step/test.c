@@ -80,8 +80,12 @@ int main() {
   //sum_array_multiply(mass, cc, xx);
 //
   //printf("sum_a:%d, sum_c:%d, mass:%lf\n", sum_a, sum_c, mass);
-  double a;
-  a = a + 1;
-  printf("a:%lf\n", a);
-  return 0;
+  //double a;
+  //a = a + 1;
+  //printf("a:%lf\n", a);
+  //return 0;
+  int a = 0;
+  if(a) {
+    printf("iam\n");
+  }
 }

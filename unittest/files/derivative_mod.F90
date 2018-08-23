@@ -2100,6 +2100,109 @@ end do
 
 
   subroutine laplace_sphere_wk(s,deriv,elem,laplace,var_coef)
+!#define SW_LAP
+#ifdef SW_LAP
+!
+!   input:  s = scalar
+!   ouput:  -< grad(PHI), grad(s) >   = weak divergence of grad(s)
+!     note: for this form of the operator, grad(s) does not need to be made C0
+!
+use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
+  real(kind=real_kind), intent(in) :: s(np,np)
+  logical, intent(in) :: var_coef
+  type (derivative_t), intent(in) :: deriv
+  type (element_t), intent(in) :: elem
+  real(kind=real_kind)             :: laplace(np,np)
+  real(kind=real_kind)             :: laplace2(np,np)
+  integer i,j,l,m,n
+
+  ! Local
+  real(kind=real_kind) :: grads(np,np,2), oldgrads(np,np,2)
+
+  !call gradient_sphere(s,deriv,elem%Dinv, grads)
+
+  real(kind=real_kind) :: ds(np,np,2)
+
+  real(kind=real_kind) ::  dsdx00
+  real(kind=real_kind) ::  dsdy00
+  real(kind=real_kind) ::  v1(np,np),v2(np,np)
+
+  real(kind=real_kind) ::  vtemp(np,np,2)
+
+  call t_startf('laplace_sphere_wk')
+!!!!!!!!!!!!!!!!!!!!!!!!! subroutine gradient_sphere !!!!!!!!!!!!!!!!!!!!!!!!!!
+  do j=1,np
+     do l=1,np
+        dsdx00=0.0d0
+        dsdy00=0.0d0
+!DIR$ UNROLL(NP)
+        do i=1,np
+           dsdx00 = dsdx00 + deriv%Dvv(i,l  )*s(i,j  )
+           dsdy00 = dsdy00 + deriv%Dvv(i,l  )*s(j  ,i)
+        end do
+        v1(l  ,j  ) = dsdx00*rrearth
+        v2(j  ,l  ) = dsdy00*rrearth
+     end do
+  end do
+  ! convert covarient to latlon
+  !OMP_COLLAPSE_SIMD
+  !DIR_VECTOR_ALIGNED
+  do j=1,np
+     do i=1,np
+        grads(i,j,1)=elem%Dinv(i,j,1,1)*v1(i,j) + elem%Dinv(i,j,2,1)*v2(i,j)
+        grads(i,j,2)=elem%Dinv(i,j,1,2)*v1(i,j) + elem%Dinv(i,j,2,2)*v2(i,j)
+     enddo
+  enddo
+!!!!!!!!!!!!!!!! end gradient_sphere !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+if (var_coef) then
+   if (hypervis_power/=0 ) then
+      ! scalar viscosity with variable coefficient
+      grads(:,:,1) = grads(:,:,1)*elem%variable_hyperviscosity(:,:)
+      grads(:,:,2) = grads(:,:,2)*elem%variable_hyperviscosity(:,:)
+   else if (hypervis_scaling /=0 ) then
+      ! tensor hv, (3)
+      oldgrads=grads
+      do j=1,np
+         do i=1,np
+            grads(i,j,1) = sum(oldgrads(i,j,:)*elem%tensorVisc(i,j,1,:))
+            grads(i,j,2) = sum(oldgrads(i,j,:)*elem%tensorVisc(i,j,2,:))
+         end do
+      end do
+   else
+      ! do nothing: constant coefficient viscsoity
+   endif
+endif
+
+! note: divergnece_sphere and divergence_sphere_wk are identical *after* bndry_exchange
+! if input is C_0.  Here input is not C_0, so we should use divergence_sphere_wk().
+
+!call divergence_sphere_wk(grads,deriv,elem,laplace)
+
+!!!!!!!!!!!!!!!!!!!!! call divergence_sphere !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+do j=1,np
+   do i=1,np
+      vtemp(i,j,1)=(elem%Dinv(i,j,1,1)*grads(i,j,1) + elem%Dinv(i,j,1,2)*grads(i,j,2))
+      vtemp(i,j,2)=(elem%Dinv(i,j,2,1)*grads(i,j,1) + elem%Dinv(i,j,2,2)*grads(i,j,2))
+   enddo
+enddo
+
+do n=1,np
+   do m=1,np
+
+      laplace(m,n)=0
+!DIR$ UNROLL(NP)
+      do j=1,np
+         laplace(m,n)=laplace(m,n)-(elem%spheremp(j,n)*vtemp(j,n,1)*deriv%Dvv(m,j) &
+                          +elem%spheremp(m,j)*vtemp(m,j,2)*deriv%Dvv(n,j)) &
+                          * rrearth
+      enddo
+    enddo
+  enddo
+
+  call t_stopf('laplace_sphere_wk')
+!
+
+#else
 !
 !   input:  s = scalar
 !   ouput:  -< grad(PHI), grad(s) >   = weak divergence of grad(s)
@@ -2140,7 +2243,7 @@ end do
     ! note: divergnece_sphere and divergence_sphere_wk are identical *after* bndry_exchange
     ! if input is C_0.  Here input is not C_0, so we should use divergence_sphere_wk().
     call divergence_sphere_wk(grads,deriv,elem,laplace)
-
+#endif
   end subroutine laplace_sphere_wk
 
 

@@ -89,7 +89,7 @@ implicit none
 
   do l = 1, np
     do i = 1, np
-      deriv%Dvv(i, l) = 1
+      deriv%Dvv(i, l) = 10*l + i
     enddo
   enddo
 
@@ -97,9 +97,9 @@ implicit none
     do j = 1, np
       do i = 1, np
         elem(ie)%Dinv(i, j, 1, 1) = 1
-        elem(ie)%Dinv(i, j, 2, 1) = 1
-        elem(ie)%Dinv(i, j, 1, 2) = 1
-        elem(ie)%Dinv(i, j, 2, 2) = 1
+        elem(ie)%Dinv(i, j, 2, 1) = 2
+        elem(ie)%Dinv(i, j, 1, 2) = 3
+        elem(ie)%Dinv(i, j, 2, 2) = 4
       enddo
     enddo
   enddo
@@ -109,6 +109,18 @@ implicit none
       do i = 1, np
         elem(ie)%metdet(i, j) = 1
         elem(ie)%rmetdet(i, j) = 1
+      enddo
+    enddo
+  enddo
+
+  do ie = nets, nete
+    do j = 1, np
+      do i = 1, np
+        elem(ie)%variable_hyperviscosity(i,j) = 1
+        elem(ie)%tensorVisc(i,j,1,1) = 1
+        elem(ie)%tensorVisc(i,j,1,2) = 1
+        elem(ie)%tensorVisc(i,j,1,2) = 1
+        elem(ie)%tensorVisc(i,j,2,2) = 1
       enddo
     enddo
   enddo
@@ -124,10 +136,11 @@ use dimensions_mod, only: np, npdg, nlev, qsize
 use hybvcoord_mod, only:hvcoord_t
 use hybrid_mod, only: hybrid_t
 use derivative_mod, only: derivative_t
+use edgetype_mod, only       : EdgeBuffer_t
 implicit none
   integer, intent(in) :: np1_qdp, n0_qdp
   real(kind=real_kind) :: dt
-  type(element_t), intent(inout), target :: elem(:)
+  type(element_t), intent(inout) :: elem(:)
   type(hybrid_t), intent(in) :: hybrid
   type(derivative_t), intent(in) :: deriv
   type(hvcoord_t), intent(in) :: hvcoord
@@ -151,7 +164,7 @@ implicit none
   real(kind=real_kind), dimension(np, np,    nlev, qsize, nets:nete) :: Qtens_temp
   real(kind=real_kind), pointer, dimension(:,:,:) :: DSSvar
   real(kind=real_kind) :: dp0(nlev), qim_val(nlev), qmax_val(nlev)
-
+  type (EdgeBuffer_t) :: edgeAdv, edgeAdvp1, edgeAdvQminmax, edgeAdv1,  edgeveloc
   integer :: ie, q, i, j, k, d
   integer :: limiter_option = 8
   integer :: rhs_viss = 0
@@ -161,77 +174,94 @@ implicit none
   real(kind=real_kind) :: nu_q = -1
   type(element_t) :: elem_test(43)
 
-#define QMAX
-#ifdef QMAX
-  external :: slave_euler_step
-  type param_t
-    integer*8 :: qdp_s_ptr, qdp_leap_ptr, dp_s_ptr, divdp_proj_s_ptr   &
-        , Qtens_biharmonic, qmax, qmin
-    real(kind=real_kind) :: dt
-    integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
-  end type param_t
-  type(param_t) :: param_s
-  param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
-  param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
-  param_s%dp_s_ptr = loc(elem(nets)%derived%dp(:,:,:))
-  param_s%divdp_proj_s_ptr = loc(elem(nets)%derived%divdp_proj(:,:,:))
-  param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
-  param_s%qmax = loc(qmax)
-  param_s%qmin = loc(qmin)
-  param_s%dt = dt
-  param_s%nets = nets
-  param_s%nete = nete
-  param_s%np1_qdp = np1_qdp
-  param_s%n0_qdp = n0_qdp
-  param_s%DSSopt = DSSopt
-  param_s%rhs_multiplier = rhs_multiplier
-  param_s%qsize = qsize
+  interface
+    subroutine biharmonic_wk_scalar(elem, Qtens_biharmonic, deriv, edgeAdv, hybrid, nets, nete)
+      use kinds , only: real_kind
+      use element_mod, only: element_t
+      use hybrid_mod, only: hybrid_t
+      use derivative_mod, only: derivative_t
+      use edgetype_mod, only       : EdgeBuffer_t
+      type(element_t) :: elem(:)
+      real(kind=real_kind) :: Qtens_biharmonic(:,:,:,:,:)
+      type(EdgeBuffer_t) :: edgeAdv
+      type(derivative_t) :: deriv
+      type(hybrid_t) :: hybrid
+      integer :: nets, nete
+    end subroutine biharmonic_wk_scalar
+  end interface
   call athread_init()
-  call athread_spawn(slave_euler_step, param_s)
-  call athread_join()
-#else
-  !external :: slave_euler_v
-  !type param_2d_t
-  !  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
-  !  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp    \
-  !  , qmax, qmin
-  !  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
-  !  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
-  !      , rhs_viss
-  !end type param_2d_t
-  !type(param_2d_t) :: param_2d_s
-  !param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
-  !param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
-  !param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
-  !param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
-  !param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
-  !param_2d_s%Dvv = loc(deriv%Dvv)
-  !param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
-  !param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
-  !param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
-  !param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
-  !param_2d_s%divdp = loc(elem(nets)%derived%divdp)
-  !param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
-  !param_2d_s%spheremp = loc(elem(nets)%spheremp)
-  !param_2d_s%qmax = loc(qmax)
-  !param_2d_s%qmin = loc(qmin)
-  !param_2d_s%dt = dt
-  !param_2d_s%rrearth = rrearth
-  !param_2d_s%nu_p = nu_p
-  !param_2d_s%nu_q = nu_q
-  !param_2d_s%nets = nets
-  !param_2d_s%nete = nete
-  !param_2d_s%rhs_multiplier = rhs_multiplier
-  !param_2d_s%qsize = qsize
-  !param_2d_s%n0_qdp = n0_qdp
-  !param_2d_s%np1_qdp = np1_qdp
-  !param_2d_s%limiter_option = limiter_option
-  !param_2d_s%rhs_viss = rhs_viss
-  !call athread_init()
-  !call athread_spawn(slave_euler_v, param_2d_s)
-  !call athread_join()
-#endif
+!#define QMAX
+!#ifdef QMAX
+!  external :: slave_euler_step
+!  type param_t
+!    integer*8 :: qdp_s_ptr, qdp_leap_ptr, dp_s_ptr, divdp_proj_s_ptr   &
+!        , Qtens_biharmonic, qmax, qmin
+!    real(kind=real_kind) :: dt
+!    integer :: nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize
+!  end type param_t
+!  type(param_t) :: param_s
+!  param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+!  param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+!  param_s%dp_s_ptr = loc(elem(nets)%derived%dp(:,:,:))
+!  param_s%divdp_proj_s_ptr = loc(elem(nets)%derived%divdp_proj(:,:,:))
+!  param_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+!  param_s%qmax = loc(qmax)
+!  param_s%qmin = loc(qmin)
+!  param_s%dt = dt
+!  param_s%nets = nets
+!  param_s%nete = nete
+!  param_s%np1_qdp = np1_qdp
+!  param_s%n0_qdp = n0_qdp
+!  param_s%DSSopt = DSSopt
+!  param_s%rhs_multiplier = rhs_multiplier
+!  param_s%qsize = qsize
+!  call athread_init()
+!  !call athread_spawn(slave_euler_step, param_s)
+!  !call athread_join()
+!#else
+!  !external :: slave_euler_v
+!  !type param_2d_t
+!  !  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
+!  !  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp    \
+!  !  , qmax, qmin
+!  !  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
+!  !  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
+!  !      , rhs_viss
+!  !end type param_2d_t
+!  !type(param_2d_t) :: param_2d_s
+!  !param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+!  !param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+!  !param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+!  !param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
+!  !param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+!  !param_2d_s%Dvv = loc(deriv%Dvv)
+!  !param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
+!  !param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
+!  !param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+!  !param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+!  !param_2d_s%divdp = loc(elem(nets)%derived%divdp)
+!  !param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
+!  !param_2d_s%spheremp = loc(elem(nets)%spheremp)
+!  !param_2d_s%qmax = loc(qmax)
+!  !param_2d_s%qmin = loc(qmin)
+!  !param_2d_s%dt = dt
+!  !param_2d_s%rrearth = rrearth
+!  !param_2d_s%nu_p = nu_p
+!  !param_2d_s%nu_q = nu_q
+!  !param_2d_s%nets = nets
+!  !param_2d_s%nete = nete
+!  !param_2d_s%rhs_multiplier = rhs_multiplier
+!  !param_2d_s%qsize = qsize
+!  !param_2d_s%n0_qdp = n0_qdp
+!  !param_2d_s%np1_qdp = np1_qdp
+!  !param_2d_s%limiter_option = limiter_option
+!  !param_2d_s%rhs_viss = rhs_viss
+!  !call athread_init()
+!  !call athread_spawn(slave_euler_v, param_2d_s)
+!  !call athread_join()
+!#endif
 
+  call biharmonic_wk_scalar(elem, Qtens_biharmonic, deriv, edgeAdv, hybrid, nets, nete)
 #if 0
 !#define PRINT_QTEN
 #ifdef PRINT_QTEN
@@ -264,3 +294,75 @@ implicit none
 #endif
 
 end subroutine euler_step
+
+subroutine biharmonic_wk_scalar(elem, qtens, deriv, edgeq, hybrid, nets, nete)
+use kinds , only: real_kind
+use physical_constants, only: rrearth
+use element_mod, only: element_t
+use dimensions_mod, only: np, npdg, nlev, qsize
+use hybvcoord_mod, only:hvcoord_t
+use hybrid_mod, only: hybrid_t
+use derivative_mod, only: derivative_t
+use edgetype_mod, only       : EdgeBuffer_t
+use control_mod, only : hypervis_scaling, hypervis_power
+implicit none
+
+type(hybrid_t),  intent(in) :: hybrid
+type(element_t), intent(inout), target :: elem(:)
+integer :: nets, nete
+real(kind=real_kind), dimension(np, np, nlev, qsize, nets:nete) :: Qtens
+type(EdgeBuffer_t),  intent(inout) :: edgeq
+type(derivative_t), intent(in) :: deriv
+
+
+! local
+integer :: k, kptr, i, j, ie, ic, q
+real(kind=real_kind), dimension(np,np) :: lap_p
+integer :: step_elem
+external :: slave_biharmonic_wk_scalar
+type param_t
+  integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
+      , Dvv
+  real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
+  integer :: nets, nete, qsize, step_elem
+end type param_t
+type(param_t) :: param_s
+
+param_s%Dinv = loc(elem(nets)%Dinv)
+param_s%rspheremp = loc(elem(nets)%rspheremp)
+param_s%spheremp = loc(elem(nets)%spheremp)
+param_s%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
+param_s%tensorVisc = loc(elem(nets)%tensorVisc)
+param_s%Qtens = loc(Qtens)
+param_s%Dvv = loc(deriv%Dvv)
+param_s%rrearth = rrearth
+param_s%hypervis_scaling = hypervis_scaling
+param_s%hypervis_power = hypervis_power
+param_s%nets = nets
+param_s%nete = nete
+param_s%qsize = qsize
+param_s%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
+call athread_spawn(slave_biharmonic_wk_scalar, param_s)
+call athread_join()
+
+print *, param_s%step_elem
+#if 1
+  do ie = nets, 1
+    do q = 1, qsize
+      do k = 1, nlev
+        do j = 1, np
+          do i = 1, np
+            !print *, elem(ie)%variable_hyperviscosity(i,j), elem(ie)%tensorVisc(i,j,1,1) \
+            !    , elem(ie)%tensorVisc(i,j,1,2), elem(ie)%tensorVisc(i,j,1,2)       \
+            !    , elem(ie)%tensorVisc(i,j,2,2)
+            print *, Qtens(i,j,k,q,ie)
+          enddo
+        enddo
+      enddo
+    enddo
+  enddo
+
+#endif
+
+
+end subroutine biharmonic_wk_scalar

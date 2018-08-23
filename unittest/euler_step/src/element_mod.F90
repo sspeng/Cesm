@@ -66,6 +66,10 @@ use dimensions_mod, only: np, nlev, nlevp, qsize_d, qsize
      real (kind=real_kind)    :: Dinv(np,np,2,2)                      ! Map vector field
      real (kind=real_kind)    :: spheremp(np,np)                      ! mass matrix on v and p grid
      real (kind=real_kind)    :: rspheremp(np,np)                     ! inverse mass matrix on v and p grid
+     real (kind=real_kind)    :: variable_hyperviscosity(np,np)       ! hyperviscosity based on above
+     real (kind=real_kind)    :: hv_courant                           ! hyperviscosity courant number
+     real (kind=real_kind)    :: tensorVisc(np,np,2,2)                !og, matrix V for tensor viscosity
+
   end type element_t
 
 end module element_mod
