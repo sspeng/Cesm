@@ -132,7 +132,7 @@ subroutine euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv ,
 use kinds , only: real_kind
 use physical_constants, only: rrearth
 use element_mod, only: element_t
-use dimensions_mod, only: np, npdg, nlev, qsize
+use dimensions_mod, only: np, npdg, nlev, qsize, max_corner_elem, max_neigh_edges, nelemd
 use hybvcoord_mod, only:hvcoord_t
 use hybrid_mod, only: hybrid_t
 use derivative_mod, only: derivative_t
@@ -261,6 +261,11 @@ implicit none
 !  !call athread_join()
 !#endif
 
+  allocate(edgeAdv%putmap(max_neigh_edges,nelemd))
+  allocate(edgeAdv%getmap(max_neigh_edges,nelemd))
+  allocate(edgeAdv%reverse(max_neigh_edges,nelemd))
+  allocate(edgeAdv%buf(2000))
+
   call biharmonic_wk_scalar(elem, Qtens_biharmonic, deriv, edgeAdv, hybrid, nets, nete)
 #if 0
 !#define PRINT_QTEN
@@ -293,13 +298,16 @@ implicit none
 #endif
 #endif
 
+  deallocate(edgeAdv%putmap)
+  deallocate(edgeAdv%getmap)
+  deallocate(edgeAdv%reverse)
 end subroutine euler_step
 
 subroutine biharmonic_wk_scalar(elem, qtens, deriv, edgeq, hybrid, nets, nete)
 use kinds , only: real_kind
 use physical_constants, only: rrearth
 use element_mod, only: element_t
-use dimensions_mod, only: np, npdg, nlev, qsize
+use dimensions_mod, only: np, npdg, nlev, qsize, max_corner_elem, max_neigh_edges, nelemd
 use hybvcoord_mod, only:hvcoord_t
 use hybrid_mod, only: hybrid_t
 use derivative_mod, only: derivative_t
@@ -318,15 +326,39 @@ type(derivative_t), intent(in) :: deriv
 ! local
 integer :: k, kptr, i, j, ie, ic, q
 real(kind=real_kind), dimension(np,np) :: lap_p
+integer :: reverse(4, nets:nete)
 integer :: step_elem
 external :: slave_biharmonic_wk_scalar
 type param_t
   integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
       , Dvv
+  integer*8 :: putmap, reverse
   real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
   integer :: nets, nete, qsize, step_elem
 end type param_t
 type(param_t) :: param_s
+do ie = nets, nete
+  if (edgeq%reverse(west, ie)) then
+    reverse(1, ie) = 1
+  else
+    reverse(1, ie) = 0
+  endif
+  if (edgeq%reverse(east, ie)) then
+    reverse(2, ie) = 1
+  else
+    reverse(2, ie) = 0
+  endif
+  if (edgeq%reverse(south, ie)) then
+    reverse(3, ie) = 1
+  else
+    reverse(3, ie) = 0
+  endif
+  if (edgeq%reverse(north, ie)) then
+    reverse(4, ie) = 1
+  else
+    reverse(4, ie) = 0
+  endif
+enddo
 
 param_s%Dinv = loc(elem(nets)%Dinv)
 param_s%rspheremp = loc(elem(nets)%rspheremp)
@@ -335,6 +367,8 @@ param_s%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
 param_s%tensorVisc = loc(elem(nets)%tensorVisc)
 param_s%Qtens = loc(Qtens)
 param_s%Dvv = loc(deriv%Dvv)
+param_s%putmap = loc(edgeq%putmap(1,nets))
+param_s%reverse = loc(reverse)
 param_s%rrearth = rrearth
 param_s%hypervis_scaling = hypervis_scaling
 param_s%hypervis_power = hypervis_power
@@ -346,7 +380,7 @@ call athread_spawn(slave_biharmonic_wk_scalar, param_s)
 call athread_join()
 
 print *, param_s%step_elem
-#if 1
+#if 0
   do ie = nets, 1
     do q = 1, qsize
       do k = 1, nlev

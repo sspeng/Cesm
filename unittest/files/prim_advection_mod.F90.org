@@ -7,8 +7,8 @@
 #define DIR_VECTOR_ALIGNED DIR$ VECTOR ALIGNED
 #endif
 
-#define LIMITER_ORIGINAL 1
-!#define LIMITER_REWRITE_OPT 1
+!#define LIMITER_ORIGINAL 1
+#define LIMITER_REWRITE_OPT 1
 #define OVERLAP 1
 
 #if 0
@@ -1910,7 +1910,6 @@ end subroutine ALE_parametric_coords
   use edge_mod       , only : edgevpack, edgevunpack
   use bndry_mod      , only : bndry_exchangev
   use hybvcoord_mod  , only : hvcoord_t
-  use spmd_utils,  only : iam
 #if USE_CUDA_FORTRAN
   use cuda_mod, only: euler_step_cuda
 #endif
@@ -2275,24 +2274,6 @@ end subroutine ALE_parametric_coords
 
   enddo
 !   call t_stopf('euler_step')
-#define PRINT
-  !#undef PRINT
-#ifdef PRINT
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  if (iam == 0) then
-    print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-    do ie = nets, nete
-      do q = 1, qsize
-        do k = 1, nlev
-          print *, elem(ie)%state%Qdp(np,np,k,q,np1_qdp), elem(ie)%state%Qdp(np,np,k,q,n0_qdp)
-        enddo
-      enddo
-    enddo
-    print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-  endif
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#endif
-
   end subroutine euler_step
 
 !-----------------------------------------------------------------------------
@@ -2686,6 +2667,7 @@ end subroutine ALE_parametric_coords
     integer :: maxiter = np*np-1
     real (kind=real_kind) :: tol_limiter = 5e-14
 
+    call t_startf('LIMITER_REWRITE_OPT')
     do k = 1, nlev
 
      do k1=1,np*np
@@ -2769,6 +2751,7 @@ end subroutine ALE_parametric_coords
     enddo
   enddo
 
+    call t_stopf('LIMITER_REWRITE_OPT')
   end subroutine limiter_optim_iter_full
 #endif
 

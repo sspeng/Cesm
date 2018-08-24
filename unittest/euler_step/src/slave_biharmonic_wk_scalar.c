@@ -7,6 +7,16 @@
 #define UR 3         // a unit that divides qsize by row direcion
 #define NC 4
 #define NR 16
+#define west  1
+#define east  2
+#define south 3
+#define north 4
+#define swest 5
+#define seast 6
+#define nwest 7
+#define neast 8
+#define max_neigh_edges   8
+#define max_corner_elem   1
 #define block_Dinv        (2*2*NP*NP)
 #define block_tensor      (2*2*NP*NP)
 #define block_qtens       (UC*NLEV*NP*NP)
@@ -15,7 +25,8 @@
 #define abs(value, ret) asm volatile ("fcpys $31, %1, %0" : "=r"(ret) : "r"(value))
 
 typedef struct {
-  double *Dinv, *rspheremp, *spheremp, *variable_hyper, *tensorVisc, *qtens, *Dvv;
+  double *Dinv, *rspheremp, *spheremp, *variable_hyper, *tensorVisc, *qtens, *Dvv, *buf;
+  int *putmap, *reverse;
   double rrearth, hypervis_scaling, hypervis_power;
   int nets, nete, qsize, step_elem;
 } param_t;
@@ -38,6 +49,9 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
   double *gl_tensorVisc = param_d.tensorVisc;
   double *gl_qtens = param_d.qtens;
   double *gl_Dvv = param_d.Dvv;
+  double *gl_buf = param_d.buf;
+  int    *gl_putmap = param_d.putmap;
+  int    *reverse = param_d.reverse;
   double rrearth = param_d.rrearth;
   double hypervis_scaling = param_d.hypervis_scaling;
   double hypervis_power = param_d.hypervis_power;
@@ -58,6 +72,10 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
   double v1[NP*NP];
   double v2[NP*NP];
   double vtemp[NP*NP*2];
+  int putmap[max_neigh_edges];
+  int reverse[4];
+  double buf_1[UC*NLEV*NP];
+  double buf_2[UC*NLEV];
 
   double dsdx00, dsdy00; int var_coef = 1;
   double oldgrads_1, oldgrads_2, tensor_1, tensor_2;
@@ -66,17 +84,20 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
 #if 0
   if (id == 0) {
     int size_tol = sizeof(double)*(block_Dinv + block_tensor + block_qtens     \
-        + 11*NP*NP);
+        + 11*NP*NP + max_neigh_edges*2 + NP*NLEV + NLEV);
     printf("slave_euler_step size_tol:%dk\n", size_tol/1024);
   }
 #endif
 
   pe_get(gl_Dvv, Dvv, NP*NP*sizeof(double));
   dma_syn();
-
+  // local variables
+  // local variables of edgeVpack
+  int ll, kptr, iptr, edgeptr, is, ie, in, iw, ir, edgeptr;
+  // local variables of laplace_sphere_wk
   double *src_Dinv, *src_rspheremp, *src_spheremp, *src_variable_hyper,        \
       *src_tensorVisc, *src_qtens;
-
+  double *src_putmap, *src_buf, *src_reverse;
   rid = id / NC;
   cid = id % NC;
   int loop_r = ((nete - nets + 1) + UR*NR - 1)/(UR*NR);
@@ -104,11 +125,15 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
       src_variable_hyper = gl_variable_hyper                 \
           + (rbeg + ie)*step_elem;
       src_tensorVisc = gl_tensorVisc + (rbeg + ie)*step_elem;
+      src_putmap = gl_putmap + (rbeg + ie)*max_neigh_edges;
+      src_reverse = gl_reverse + (rbeg + ie)*4;
       pe_get(src_Dinv, Dinv, block_Dinv*sizeof(double));
       pe_get(src_rspheremp, rspheremp, NP*NP*sizeof(double));
       pe_get(src_spheremp, spheremp, NP*NP*sizeof(double));
       pe_get(src_tensorVisc, tensorVisc, block_tensor*sizeof(double));
       pe_get(src_variable_hyper, variable_hyper, NP*NP*sizeof(double));
+      pe_get(src_putmap, putmap, max_neigh_edges*sizeof(int));
+      pe_get(src_reverse, reverse, 4*sizeof(int));
       dma_syn();
       for (c = 0; c < loop_c; c++) {
         cbeg = c*NC*UC + cid*UC;
@@ -117,6 +142,7 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
         cn = cend - cbeg;
         if (cn > 0) {  // if cn < 0, the dma will get exceptional contribution
           src_qtens = gl_qtens + (rbeg + ie)*istep_qtens + cbeg*qstep_qtens;
+          src_buf = gl_buf + (rbeg + ie)*istep_qtens + cbeg*qstep_qtens;
           pe_get(src_qtens, qtens, block_qtens*sizeof(double));
           dma_syn();
           for (q = 0; q < cn; q++) {
@@ -228,6 +254,121 @@ void slave_biharmonic_wk_scalar_(param_t *param_s) {
             }  // end loop k
           }  // end loop q
           pe_put(src_qtens, qtens, cn*NLEV*NP*NP*sizeof(double));
+          dma_syn();
+          for (q = 0; q < cn; q++) {
+            //kptr = NLEV*(cbeg + q - 1);
+            kptr = NLEV*(q - 1);
+            is = putmap[south];
+            ie = putmap[east];
+            in = putmap[north];
+            iw = putmap[west];
+            for (k = 0; k < NLEV; k++) {
+              iptr = NP*(kptr + k - 1);
+              for (i = 0; i < NP; i++)  {
+                int pos_qtens_1 = q*NLEV*NP*NP + k*NP*NP + i*NP + NP;
+                int pos_qtens_2 = q*NLEV*NP*NP + k*NP*NP + NP + i;
+                int pos_qtens_3 = q*NLEV*NP*NP + k*NP*NP + NP*NP + i;
+                int pos_qtens_4 = q*NLEV*NP*NP + k*NP*NP + i*NP;
+                int pos_buf_1 = iptr + ie + i;
+                int pos_buf_2 = iptr + is + i;
+                int pos_buf_3 = iptr + in + i;
+                int pos_buf_4 = iptr + iw + i;
+                buf_1[pos_buf_1] = qtens[pos_qtens_1];
+                buf_1[pos_buf_2] = qtens[pos_qtens_2];
+                buf_1[pos_buf_3] = qtens[pos_qtnes_3];
+                buf_1[pos_buf_4] = qtens[pos_qtens_4];
+              }
+            }
+            if (reverse(south)) {
+              for (k = 0; k < NLEV; k++) {
+                iptr = np*(kptr + k - 1) + is;
+                for (i = 0; i < NP; i++) {
+                  ir = NP - i + 1;
+                  int pos_buf = iptr + ir;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i;
+                  buf_1[pos_buf] = qtens[pos_qtens];
+                }
+              }
+            }
+            if (reverse(east)) {
+              for (k = 0; k < NLEV; k++) {
+                iptr = NP*(kptr + k - 1) + ie;
+                for (i = 0; i < NP; i++) {
+                  ir = NP - i + 1;
+                  int pos_buf = iptr + ir;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i*NP + NP;
+                  buf_1[pos_buf] = qtens[pos_qtens];
+                }
+              }
+            }
+            if (reverse(north)) {
+              for (k = 0; k < NLEV; k++) {
+                iptr = NP*(kptr + k - 1) + in;
+                for (i = 0; i < NP; i++) {
+                  ir = NP - i + 1;
+                  int pos_buf = iptr + ir;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP*NP + i;
+                  buf_1[pos_buf] = qtens[pos_qtens];
+                }
+              }
+            }
+            if (reverse(west)) {
+              for (k = 0; k < NLEV; k++) {
+                iptr = NP*(kptr + k - 1) + iw;
+                for (i = 0; i < NP; i++) {
+                  ir = NP - i + 1;
+                  int pos_buf = iptr + ir;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i*NP;
+                  buf_1[pos_buf] = qtens[pos_qtens];
+                }
+              }
+            }
+            // SWEST
+            for (ll = swest, swest + max_corner_elem - 1) {
+              if (putmap(ll) != -1) {
+                edgeptr = putmap(ll) + 1;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k - 1) + edgeptr;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP;
+                  buf_1[iptr] = qtens[pos_qtens];
+                }
+              }
+            }
+            // SEAST
+            for (ll = swest + max_corner_elem, swest + 2*max_corner_elem - 1) {
+              if (putmap(ll) != -1) {
+                edgeptr = putmap(ll) + 1;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k - 1) + edgeptr;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP;
+                  buf_1[iptr] = qtens[pos_qtens];
+                }
+              }
+            }
+            // NEAST
+            for (ll = swest + 3*max_corner_elem, swest + 4*max_corner_elem - 1) {
+              if (putmap(ll) != -1) {
+                edgeptr = putmap(ll) + 1;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k - 1) + edgeptr;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP*NP + NP;
+                  buf_1[iptr] = qtens[pos_qtens];
+                }
+              }
+            }
+            // NWEST
+            for (ll = swest + 2*max_corner_elem, swest + 3*max_corner_elem - 1) {
+              if (putmap(ll) != -1) {
+                edgeptr = putmap(ll) + 1;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k - 1) + edgeptr;
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP*NP;
+                  buf_1[iptr] = qtens[pos_qtens];
+                }
+              }
+            }
+          }  // end loop q
+          pe_put(src_buf, buf_1, cn*NLEV*NP*NP*sizeof(double));
           dma_syn();
         }  // end if cn > 0
       }  // end loop_c

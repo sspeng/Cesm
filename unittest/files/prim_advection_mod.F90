@@ -7,8 +7,8 @@
 #define DIR_VECTOR_ALIGNED DIR$ VECTOR ALIGNED
 #endif
 
-#define LIMITER_ORIGINAL 1
-!#define LIMITER_REWRITE_OPT 1
+!#define LIMITER_ORIGINAL 1
+#define LIMITER_REWRITE_OPT 1
 #define OVERLAP 1
 
 #if 0
@@ -3081,6 +3081,7 @@ end subroutine euler_step
     real (kind=real_kind) :: tol_limiter = 1e-15
     integer, parameter :: maxiter = 5
 
+    call t_startf('LIMITER_ORIGIN')
     do k = 1 , nlev
       weights(:,k) = sphweights(:) * dpmass(:,k)
       ptens(:,k) = ptens(:,k) / dpmass(:,k)
@@ -3210,6 +3211,7 @@ end subroutine euler_step
     do k = 1 , nlev
       ptens(:,k) = ptens(:,k) * dpmass(:,k)
     enddo
+    call t_stopf('LIMITER_ORIGIN')
   end subroutine limiter_optim_iter_full
 #endif
 
@@ -3243,6 +3245,7 @@ end subroutine euler_step
     integer :: maxiter = np*np-1
     real (kind=real_kind) :: tol_limiter = 5e-14
 
+    call t_startf('LIMITER_REWRITE_OPT')
     do k = 1, nlev
 
      do k1=1,np*np
@@ -3326,6 +3329,7 @@ end subroutine euler_step
     enddo
   enddo
 
+    call t_stopf('LIMITER_REWRITE_OPT')
   end subroutine limiter_optim_iter_full
 #endif
 
