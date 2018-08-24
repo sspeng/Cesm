@@ -1905,7 +1905,7 @@ subroutine euler_step( np1_qdp , n0_qdp , dt , elem , hvcoord , hybrid , deriv ,
 !
 ! ===================================
 use kinds          , only : real_kind
-use dimensions_mod , only : np, npdg, nlev
+use dimensions_mod , only : np, npdg, nlev, max_neigh_edges, nelemd
 use hybrid_mod     , only : hybrid_t
 use element_mod    , only : element_t
 use derivative_mod , only : derivative_t, divergence_sphere, gradient_sphere, vorticity_sphere
@@ -2445,16 +2445,21 @@ call t_stopf('sw_edgePack')
 call t_stopf('sw_euler_step')
 
 #define PRINT
-#undef PRINT
+!#undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   if (iam == 0) then
     print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
+    !do ie = nets, nete
+    !  do q = 1, qsize
+    !    do k = 1, nlev
+    !      print *, elem(ie)%state%Qdp(np,np,k,q,np1_qdp), elem(ie)%state%Qdp(np,np,k,q,n0_qdp)
+    !    enddo
+    !  enddo
+    !enddo
     do ie = nets, nete
-      do q = 1, qsize
-        do k = 1, nlev
-          print *, elem(ie)%state%Qdp(np,np,k,q,np1_qdp), elem(ie)%state%Qdp(np,np,k,q,n0_qdp)
-        enddo
+      do i = 1, max_neigh_edges
+        print *, ">>>>   " , ie, i, edgeAdv%putmap(i, ie) 
       enddo
     enddo
     print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
