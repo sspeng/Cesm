@@ -7,6 +7,16 @@
 #define UR 3         // a unit that divides qsize by row direcion
 #define NC 4
 #define NR 16
+#define west  1
+#define east  2
+#define south 3
+#define north 4
+#define swest 5
+#define seast 6
+#define nwest 7
+#define neast 8
+#define max_neigh_edges   8
+#define max_corner_elem   1
 #define block_Dinv        (2*2*NP*NP)
 #define block_tensor      (2*2*NP*NP)
 #define block_qtens       (UC*NLEV*NP*NP)
@@ -15,7 +25,8 @@
 #define abs(value, ret) asm volatile ("fcpys $31, %1, %0" : "=r"(ret) : "r"(value))
 
 typedef struct {
-  double *Dinv, *rspheremp, *spheremp, *variable_hyper, *tensorVisc, *qtens, *Dvv;
+  double *Dinv, *rspheremp, *spheremp, *variable_hyper, *tensorVisc, *qtens, *Dvv, *receive;
+  int *getmap;
   double rrearth, hypervis_scaling, hypervis_power;
   int nets, nete, qsize, step_elem;
 } param_t;
@@ -38,6 +49,8 @@ void slave_biharmonic_wk_scalar_2_(param_t *param_s) {
   double *gl_tensorVisc = param_d.tensorVisc;
   double *gl_qtens = param_d.qtens;
   double *gl_Dvv = param_d.Dvv;
+  double *gl_receive = param_d.receive;
+  int    *gl_getmap = param_d.getmap;
   double rrearth = param_d.rrearth;
   double hypervis_scaling = param_d.hypervis_scaling;
   double hypervis_power = param_d.hypervis_power;
@@ -58,6 +71,9 @@ void slave_biharmonic_wk_scalar_2_(param_t *param_s) {
   double v1[NP*NP];
   double v2[NP*NP];
   double vtemp[NP*NP*2];
+  int getmap[max_neigh_edges];
+  double receive[UC*NLEV*NP];
+  double receive_1[UC*NLEV];
 
   double dsdx00, dsdy00; int var_coef = 1;
   double oldgrads_1, oldgrads_2, tensor_1, tensor_2;
@@ -73,9 +89,13 @@ void slave_biharmonic_wk_scalar_2_(param_t *param_s) {
 
   pe_get(gl_Dvv, Dvv, NP*NP*sizeof(double));
   dma_syn();
-
+  // local variables
+  // local variables of edgeVunpack
+  int ll, kptr, iptr, edgeptr, is, iee, in, iw, ir;
+  // local variables of laplace_sphere_wk
   double *src_Dinv, *src_rspheremp, *src_spheremp, *src_variable_hyper,        \
-      *src_tensorVisc, *src_qtens;
+      *src_tensorVisc, *src_qtens, *src_receive;
+  int *src_getmap;
 
   rid = id / NC;
   cid = id % NC;
@@ -104,12 +124,20 @@ void slave_biharmonic_wk_scalar_2_(param_t *param_s) {
       src_variable_hyper = gl_variable_hyper                 \
           + (rbeg + ie)*step_elem;
       src_tensorVisc = gl_tensorVisc + (rbeg + ie)*step_elem;
+      src_getmap = gl_getmap + (rbeg + ie)*max_neigh_edges;
       pe_get(src_Dinv, Dinv, block_Dinv*sizeof(double));
       pe_get(src_rspheremp, rspheremp, NP*NP*sizeof(double));
       pe_get(src_spheremp, spheremp, NP*NP*sizeof(double));
       pe_get(src_tensorVisc, tensorVisc, block_tensor*sizeof(double));
       pe_get(src_variable_hyper, variable_hyper, NP*NP*sizeof(double));
+      pe_get(src_getmap, getmap, max_neigh_edges*sizeof(int));
       dma_syn();
+      // is iee in iw is offset of edgebuf which has relationship with four direcion
+      // is iee in iw only has ie dimension
+      is = getmap[south - 1];
+      iee = getmap[east - 1];
+      in = getmap[north - 1];
+      iw = getmap[west - 1];
       for (c = 0; c < loop_c; c++) {
         cbeg = c*NC*UC + cid*UC;
         cend = c*NC*UC + (cid + 1)*UC;
@@ -119,6 +147,133 @@ void slave_biharmonic_wk_scalar_2_(param_t *param_s) {
           src_qtens = gl_qtens + (rbeg + ie)*istep_qtens + cbeg*qstep_qtens;
           pe_get(src_qtens, qtens, block_qtens*sizeof(double));
           dma_syn();
+          // ---------------------- start of edgeVunpack ---------------------//
+          // ------------------------------East ------------------------------//
+          src_receive = gl_receive + iee + cbeg*NLEV*NP;
+          pe_get(src_receive, receive, cn*NLEV*NP*sizeof(double));
+          dma_syn();
+          for (q = 0; q < cn; q++) {
+            kptr = q*NLEV;
+            for (k = 0; k < NLEV; k++) {
+              iptr = NP*(kptr + k);
+              for (i = 0; i < NP; i++) {
+                int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i*NP + (NP - 1);
+                int pos_receive = iptr + i;
+                qtens[pos_qtens] = qtens[pos_qtens] + receive[pos_receive];
+              }
+            }
+          }
+          // ----------------------------- South ------------------------------//
+          src_receive = gl_receive + is + cbeg*NLEV*NP;
+          pe_get(src_receive, receive, cn*NLEV*NP*sizeof(double));
+          dma_syn();
+          for (q = 0; q < cn; q++) {
+            kptr = q*NLEV;
+            for (k = 0; k < NLEV; k++) {
+              iptr = NP*(kptr + k);
+              for (i = 0; i < NP; i++) {
+                int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i;
+                int pos_receive = iptr + i;
+                qtens[pos_qtens] = qtens[pos_qtens] + receive[pos_receive];
+              }
+            }
+          }
+          // ----------------------------- North ------------------------------//
+          src_receive = gl_receive + in + cbeg*NLEV*NP;
+          pe_get(src_receive, receive, cn*NLEV*NP*sizeof(double));
+          dma_syn();
+          for (q = 0; q < cn; q++) {
+            kptr = q*NLEV;
+            for (k = 0; k < NLEV; k++) {
+              iptr = NP*(kptr + k);
+              for (i = 0; i < NP; i++) {
+                int pos_qtens = q*NLEV*NP*NP + k*NP*NP + (NP - 1)*NP + i;
+                int pos_receive = iptr + i;
+                qtens[pos_qtens] = qtens[pos_qtens] + receive[pos_receive];
+              }
+            }
+          }
+          // ----------------------------- West ------------------------------//
+          src_receive = gl_receive + iw + cbeg*NLEV*NP;
+          pe_get(src_receive, receive, cn*NLEV*NP*sizeof(double));
+          dma_syn();
+          for (q = 0; q < cn; q++) {
+            kptr = q*NLEV;
+            for (k = 0; k < NLEV; k++) {
+              iptr = NP*(kptr + k);
+              for (i = 0; i < NP; i++) {
+                int pos_qtens = q*NLEV*NP*NP + k*NP*NP + i*NP;
+                int pos_receive = iptr + i;
+                qtens[pos_qtens] = qtens[pos_qtens] + receive[pos_receive];
+              }
+            }
+          }
+          // ----------------------- SWEST -------------------------------- //
+          for (ll = swest - 1; ll < (swest + max_corner_elem - 1); ll++) {
+            if (getmap[ll] != -1) {
+              src_receive = gl_receive + getmap[ll] + cbeg*NLEV;
+              pe_get(src_receive, receive_1, cn*NLEV*sizeof(double));
+              dma_syn();
+              for (q = 0; q < cn; q++) {
+                kptr = q*NLEV;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k);
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP;
+                  qtens[pos_qtens] = qtens[pos_qtens] + receive_1[iptr];
+                }
+              }
+            }
+          }  // end loop ll
+          // ----------------------- SEAST -------------------------------- //
+          for (ll = swest + max_corner_elem - 1; ll < (swest + 2*max_corner_elem - 1); ll++) {
+            if (getmap[ll] != -1) {
+              src_receive = gl_receive + getmap[ll] + cbeg*NLEV;
+              pe_get(src_receive, receive_1, cn*NLEV*sizeof(double));
+              dma_syn();
+              for (q = 0; q < cn; q++) {
+                kptr = q*NLEV;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k);
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP - 1;
+                  qtens[pos_qtens] = qtens[pos_qtens] + receive_1[iptr];
+                }
+              }
+            }
+          }  // end loop ll
+          // ----------------------- NEAST -------------------------------- //
+          for (ll = swest + 3*max_corner_elem - 1; ll < (swest + 4*max_corner_elem - 1); ll++) {
+            if (getmap[ll] != -1) {
+              src_receive = gl_receive + getmap[ll] + cbeg*NLEV;
+              pe_get(src_receive, receive_1, cn*NLEV*sizeof(double));
+              dma_syn();
+              for (q = 0; q < cn; q++) {
+                kptr = q*NLEV;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k);
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP*(NP - 1) + NP - 1;
+                  qtens[pos_qtens] = qtens[pos_qtens] + receive_1[iptr];
+                }
+              }
+            }
+          }  // end loop ll
+          // ----------------------- NWEST -------------------------------- //
+          for (ll = swest + 2*max_corner_elem - 1; ll < (swest + 3*max_corner_elem - 1); ll++) {
+            if (getmap[ll] != -1) {
+              src_receive = gl_receive + getmap[ll] + cbeg*NLEV;
+              pe_get(src_receive, receive_1, cn*NLEV*sizeof(double));
+              dma_syn();
+              for (q = 0; q < cn; q++) {
+                kptr = q*NLEV;
+                for (k = 0; k < NLEV; k++) {
+                  iptr = (kptr + k);
+                  int pos_qtens = q*NLEV*NP*NP + k*NP*NP + NP*(NP - 1);
+                  qtens[pos_qtens] = qtens[pos_qtens] + receive_1[iptr];
+                }
+              }
+            }
+          }  // end loop ll ----- end of edgeVunpack ----
+
+          // ----------- start gradient_sphere divergence_sphere ------------//
           for (q = 0; q < cn; q++) {
             for (k = 0; k < NLEV; k++) {
               for (j = 0; j < NP; j++) {

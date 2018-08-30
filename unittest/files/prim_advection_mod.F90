@@ -7,8 +7,8 @@
 #define DIR_VECTOR_ALIGNED DIR$ VECTOR ALIGNED
 #endif
 
-#define LIMITER_ORIGINAL 1
-!#define LIMITER_REWRITE_OPT 1
+!#define LIMITER_ORIGINAL 1
+#define LIMITER_REWRITE_OPT 1
 #define OVERLAP 1
 
 #if 0
@@ -1959,16 +1959,25 @@ end type param_t
 type(param_t) :: param_s
 
 external :: slave_euler_v
-type param_2d_t
-  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv         \
-  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp      \
-  , qmax, qmin
-  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
-  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option\
-      , rhs_viss
-end type param_2d_t
-type(param_2d_t) :: param_2d_s
+!type param_2d_t
+!  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv         \
+!  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp      \
+!  , qmax, qmin
+!  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
+!  integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option\
+!      , rhs_viss
+!end type param_2d_t
+!type(param_2d_t) :: param_2d_s
 
+  type param_2d_t
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
+    , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp    \
+    , qmax, qmin, Qtens_temp, dp_star_temp, dp_temp
+    real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
+    integer :: nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option \
+        , rhs_viss
+  end type param_2d_t
+  type(param_2d_t) :: param_2d_s
 call t_startf('sw_euler_step')
 
 do k = 1 , nlev
@@ -2032,9 +2041,9 @@ param_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
 param_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
 param_s%dp_s_ptr = loc(elem(nets)%derived%dp(:,:,:))
 param_s%divdp_proj_s_ptr = loc(elem(nets)%derived%divdp_proj(:,:,:))
-param_s%Qtens_biharmonic = loc(Qtens_biharmonic(:,:,:,:,:))
-param_s%qmax = loc(qmax(:,:,:))
-param_s%qmin = loc(qmin(:,:,:))
+param_s%Qtens_biharmonic = loc(Qtens_biharmonic(1,1,1,1,nets))
+param_s%qmax = loc(qmax(1,1,nets))
+param_s%qmin = loc(qmin(1,1,nets))
 param_s%dt = dt
 param_s%nets = nets
 param_s%nete = nete
@@ -2216,33 +2225,63 @@ enddo
 
 #ifdef SW_EULER_STEP
 call t_startf('sw_div')
-param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
-param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
-param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
-param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
-param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
-param_2d_s%Dvv = loc(deriv%Dvv)
-param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
-param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
-param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
-param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
-param_2d_s%divdp = loc(elem(nets)%derived%divdp)
-param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
-param_2d_s%spheremp = loc(elem(nets)%spheremp)
-param_2d_s%qmax = loc(qmax)
-param_2d_s%qmin = loc(qmin)
-param_2d_s%dt = dt
-param_2d_s%rrearth = rrearth
-param_2d_s%nu_p = nu_p
-param_2d_s%nu_q = nu_q
-param_2d_s%nets = nets
-param_2d_s%nete = nete
-param_2d_s%rhs_multiplier = rhs_multiplier
-param_2d_s%qsize = qsize
-param_2d_s%n0_qdp = n0_qdp
-param_2d_s%np1_qdp = np1_qdp
-param_2d_s%limiter_option = limiter_option
-param_2d_s%rhs_viss = rhs_viss
+!param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+!param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+!param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+!param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
+!param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+!param_2d_s%Dvv = loc(deriv%Dvv)
+!param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
+!param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
+!param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+!param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic(1,1,1,1,nets))
+!param_2d_s%divdp = loc(elem(nets)%derived%divdp)
+!param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
+!param_2d_s%spheremp = loc(elem(nets)%spheremp)
+!param_2d_s%qmax = loc(qmax(1,1,nets))
+!param_2d_s%qmin = loc(qmin(1,1,nets))
+!param_2d_s%dt = dt
+!param_2d_s%rrearth = rrearth
+!param_2d_s%nu_p = nu_p
+!param_2d_s%nu_q = nu_q
+!param_2d_s%nets = nets
+!param_2d_s%nete = nete
+!param_2d_s%rhs_multiplier = rhs_multiplier
+!param_2d_s%qsize = qsize
+!param_2d_s%n0_qdp = n0_qdp
+!param_2d_s%np1_qdp = np1_qdp
+!param_2d_s%limiter_option = limiter_option
+!param_2d_s%rhs_viss = rhs_viss
+  param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+  param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+  param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+  param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
+  param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+  param_2d_s%Dvv = loc(deriv%Dvv)
+  param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
+  param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
+  param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+  param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic)
+  param_2d_s%divdp = loc(elem(nets)%derived%divdp)
+  param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
+  param_2d_s%spheremp = loc(elem(nets)%spheremp)
+  param_2d_s%qmax = loc(qmax)
+  param_2d_s%qmin = loc(qmin)
+  param_2d_s%Qtens_temp = loc(Qtens_temp(1,1,1,1,nets))
+  param_2d_s%dp_star_temp = loc(dp_star_temp(1,1,1,1,nets))
+  param_2d_s%dp_temp = loc(dp_temp(1,1,1,nets))
+  param_2d_s%dt = dt
+  param_2d_s%rrearth = rrearth
+  param_2d_s%nu_p = nu_p
+  param_2d_s%nu_q = nu_q
+  param_2d_s%nets = nets
+  param_2d_s%nete = nete
+  param_2d_s%rhs_multiplier = rhs_multiplier
+  param_2d_s%qsize = qsize
+  param_2d_s%n0_qdp = n0_qdp
+  param_2d_s%np1_qdp = np1_qdp
+  param_2d_s%limiter_option = limiter_option
+  param_2d_s%rhs_viss = rhs_viss
 call athread_spawn(slave_euler_v, param_2d_s)
 call athread_join()
 call t_stopf('sw_div')
@@ -2316,6 +2355,8 @@ do ie = nets, nete
   enddo
 enddo
 
+call t_stopf('local_div')
+#endif
 do ie = nets, nete
   do q = 1, qsize
     if ( limiter_option == 8) then
@@ -2379,10 +2420,16 @@ enddo
 enddo
 enddo
 
-call t_stopf('local_div')
 
-#endif
-
+call t_startf('limiter_option4')
+if ( limiter_option == 4 ) then
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  ! sign-preserving limiter, applied after mass matrix
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+  call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
+  print *, "limiter>>>>>>>>>>>>"
+endif
+call t_stopf('limiter_option4')
 
 call t_startf('sw_edgePack')
 do ie = nets, nete
@@ -2406,7 +2453,9 @@ do ie = nets, nete
   call edgeVpack( edgeAdvp1 , DSSvar(:,:,1:nlev) , nlev , kptr , ie )
 enddo
 
+call t_startf('bndry_exchangeV')
 call bndry_exchangeV( hybrid , edgeAdvp1    )
+call t_stopf('bndry_exchangeV')
 
 do ie = nets , nete
   ! only perform this operation on thread which owns the first tracer

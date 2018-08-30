@@ -2178,7 +2178,7 @@ endif
 
 !call divergence_sphere_wk(grads,deriv,elem,laplace)
 
-!!!!!!!!!!!!!!!!!!!!! call divergence_sphere !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!!!!!!!!!!!! call divergence_sphere_wk !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 do j=1,np
    do i=1,np
       vtemp(i,j,1)=(elem%Dinv(i,j,1,1)*grads(i,j,1) + elem%Dinv(i,j,1,2)*grads(i,j,2))

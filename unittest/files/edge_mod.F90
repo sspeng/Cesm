@@ -27,14 +27,14 @@ module edge_mod
 #endif
 
 
-  ! 8-byte Integer routines 
+  ! 8-byte Integer routines
   public :: LongEdgeVpack, LongEdgeVunpackMIN
 
   ! 4-byte Integer routines
   ! public :: IntEdgeSpack, intEdgeSunpack
 
 
-  ! 8-byte Real routines 
+  ! 8-byte Real routines
   public :: zeroEdgeBuffer
 
 
@@ -54,21 +54,21 @@ module edge_mod
   public :: initEdgeSBuffer
   public :: freeEdgeBuffer
 
-  !--------------------------------------------------------- 
+  !---------------------------------------------------------
   ! Pack/unpack routines that use the New format Edge buffer
-  !--------------------------------------------------------- 
+  !---------------------------------------------------------
   interface edgeSpack
      module procedure edgeSpack_r8
-  end interface 
+  end interface
   public :: edgeSpack
 
-  public :: edgeVpack, edgeVunpack
+  public :: edgeVpack, edgeVunpack, edgeVpack_debug, edgeVunpack_debug
   public :: edgeVunpackMIN, edgeVunpackMAX
   public :: edgeDGVpack, edgeDGVunpack
   public :: edgeVunpackVert
-  
+
   !----------------------------------------------------------------
-  ! Pack/unpack routines that communicate a fixed number values 
+  ! Pack/unpack routines that communicate a fixed number values
   ! per element.  This is used to communicate MIN/MAX values from
   ! neighboring elemeents
   !----------------------------------------------------------------
@@ -85,19 +85,19 @@ module edge_mod
 !
 ! Element orientation:  index V(i,j)
 !
-!           (1,np) NWEST      (np,np) NEAST 
+!           (1,np) NWEST      (np,np) NEAST
 !
 !           (1,1) SWEST       (np,1) SEAST
 !
 !
-! for the edge neighbors:  
-!    we set the "reverse" flag if two elements who share an edge use a 
+! for the edge neighbors:
+!    we set the "reverse" flag if two elements who share an edge use a
 !    reverse orientation.  The data is reversed during the *pack* stage
-! For corner neighbors:  
+! For corner neighbors:
 !    for edge buffers, there is no orientation because two corner neighbors
 !    only share a single point.
 !    For ghost cell data, there is a again two posible orientations. For
-!    this case, we set the "reverse" flag if the corner element is using 
+!    this case, we set the "reverse" flag if the corner element is using
 !    the reverse orientation.  In this case, the data is reversed during the
 !    *unpack* stage (not sure why)
 !
@@ -110,26 +110,26 @@ module edge_mod
 !
 !
 ! Mark Taylor
-! pack/unpack full element of data of size (nx,nx)  
-! user specifies the size when creating the buffer 
-! input/output arrays are cartesian, and will only unpack 1 corner element 
-! (even if there are more when running with an unstructured grid) 
+! pack/unpack full element of data of size (nx,nx)
+! user specifies the size when creating the buffer
+! input/output arrays are cartesian, and will only unpack 1 corner element
+! (even if there are more when running with an unstructured grid)
 ! This routine is used mostly for testing and to compute the orientation of
 ! an elements corner neighbors
 !
   public :: initGhostBuffer3D      ! init/free buffers used by pack/unpack full and 3D
   public :: FreeGhostBuffer3D
-  public :: ghostVpackfull       
-  public :: ghostVunpackfull     
+  public :: ghostVpackfull
+  public :: ghostVunpackfull
   ! same as above, except orientation of element data is preserved
   ! (so boundary data for two adjacent element may not match up)
-  public :: ghostVpack_unoriented   
-  public :: ghostVunpack_unoriented     
+  public :: ghostVpack_unoriented
+  public :: ghostVunpack_unoriented
 
 
 !
 ! James Overfelt
-! pack/unpack user specifed halo region "nhc".  
+! pack/unpack user specifed halo region "nhc".
 ! Does not include element edge data (assumes element edge data is C0)
 ! (appropriate for continuous GLL data where the edge data does not need to be sent)
 ! support for unstructed meshes via extra output arrays: sw,se,ne,nw
@@ -150,12 +150,12 @@ module edge_mod
 !
 ! Christoph Erath
 ! pack/unpack partial element of data of size (nx,nx) with user specifed halo size nh
-! user specifies the sizes when creating the buffer 
+! user specifies the sizes when creating the buffer
 ! buffer has 1 extra dimension (as compared to subroutines above) for multiple tracers
 ! input/output arrays are cartesian, and thus assume at most 1 element at each corner
 ! hence currently only supports cube-sphere grids.
 !
-! TODO: GhostBufferTR (init and type) should be removed - we only need GhostBuffer3D, 
+! TODO: GhostBufferTR (init and type) should be removed - we only need GhostBuffer3D,
 ! if we can fix
 ! ghostVpack2d below to pass vlyr*ntrac_d instead of two seperate arguments
 !
@@ -163,15 +163,15 @@ module edge_mod
   public :: FreeGhostBufferTR     ! ghostbufferTR_t
 
 
-! routines which including element edge data  
+! routines which including element edge data
 ! (used for FVM arrays where edge data is not shared by neighboring elements)
 ! these routines pack/unpack element data with user specified halo size
 !
-! THESE ROUTINES SHOULD BE MERGED 
+! THESE ROUTINES SHOULD BE MERGED
 !
-  public :: ghostVpack            ! input/output: 
+  public :: ghostVpack            ! input/output:
   public :: ghostVunpack          ! v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac_d,timelevels)
-                                  
+
   public :: ghostVpackR           ! used to pack/unpack SPELT "Rp".  What's this?
   public :: ghostVunpackR         ! v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac_d)
 
@@ -183,16 +183,16 @@ module edge_mod
 !
 ! THESE ROUTINES CAN ALL BE REPLACED BY ghostVpack3D (if we make extra corner data arrays
 ! an optional argument).  Or at least these should be merged to 1 routine
-  public :: ghostVpack2d          ! input/output:  
+  public :: ghostVpack2d          ! input/output:
   public :: ghostVunpack2d        ! v(1-nhc:npoints+nhc,1-nhc:npoints+nhc, vlyr, ntrac_d,timelevels)
-                                   
+
                                   ! used to pack/unpack SPELT%sga.  what's this?
   public :: ghostVpack2d_single   ! input/output
   public :: ghostVunpack2d_single !   v(1-nhc:npoints+nhc,1-nhc:npoints+nhc)
-                                  
+
                                   ! used to pack/unpack FV vertex data (velocity/grid)
   public :: ghostVpack2d_level    ! input/output
-  public :: ghostVunpack2d_level  ! v(1-nhc:npoints+nhc,1-nhc:npoints+nhc, vlyr) 
+  public :: ghostVunpack2d_level  ! v(1-nhc:npoints+nhc,1-nhc:npoints+nhc, vlyr)
 
 
 
@@ -206,16 +206,16 @@ module edge_mod
 contains
 
   subroutine initEdgeSBuffer_r8(par,edge,elem,nlyr,bptr,rptr,bndry_type, nthreads)
-    implicit none 
+    implicit none
     type (parallel_t), intent(in) :: par
-    type (EdgeBuffer_t), intent(out), target :: edge 
+    type (EdgeBuffer_t), intent(out), target :: edge
     type (element_t), intent(in) :: elem(:)
     integer, intent(in)          :: nlyr
     real(kind=real_kind), optional, pointer :: bptr(:), rptr(:)
-    integer (kind=int_kind), intent(in), optional :: bndry_type 
+    integer (kind=int_kind), intent(in), optional :: bndry_type
     integer, intent(in), optional :: nthreads
-    
-    !local 
+
+    !local
     logical (kind=log_kind), parameter :: nMethod =.TRUE.
 
     call initEdgeBuffer_r8(par,edge,elem,nlyr,MessagePattern=HME_MPATTERN_S,bndry_type=bndry_type, &
@@ -250,7 +250,7 @@ contains
     type (element_t),intent(in)  :: elem(:)
     integer,intent(in)                :: nlyr
     integer (kind=int_kind), intent(in), optional :: MessagePattern
-    integer (kind=int_kind), intent(in), optional :: bndry_type 
+    integer (kind=int_kind), intent(in), optional :: bndry_type
     integer (kind=int_kind), intent(in), optional :: nthreads
     ! integer, intent(in)  :: globalid(:)
 
@@ -272,9 +272,9 @@ contains
     integer :: nbuf,ith
     integer :: nSendCycles, nRecvCycles
     integer :: icycle, ierr
-    integer :: ie, i 
+    integer :: ie, i
     integer :: edgeid,elemid
-    integer :: ptr,llen, mLen, tlen 
+    integer :: ptr,llen, mLen, tlen
     integer :: moveptr, moveLength
     integer :: moveptr2, moveLength2
     type (Cycle_t), pointer :: pCycle
@@ -308,13 +308,13 @@ contains
 
 !    call t_adj_detailf(+3)
 
-    if(present(MessagePattern)) then 
+    if(present(MessagePattern)) then
        mPattern=MessagePattern
     else
        mPattern=HME_MPATTERN_P
     endif
 
-    if(present(bndry_type)) then 
+    if(present(bndry_type)) then
       if ( MPI_VERSION >= 3 ) then
         edge%bndry_type = bndry_type
       else
@@ -336,12 +336,12 @@ contains
 
 !$OMP MASTER
     !
-    ! Keep a counter of how many times initedgebuffer is called.  
+    ! Keep a counter of how many times initedgebuffer is called.
     ! This is used to assign a unique message ID for the boundary exchange
     !
     initedgebuffer_callid=initedgebuffer_callid+1
     edge%id  = initedgebuffer_callid
-    edge%tag = BNDRY_TAG_BASE + MODULO(edge%id, MAX_ACTIVE_MSG) 
+    edge%tag = BNDRY_TAG_BASE + MODULO(edge%id, MAX_ACTIVE_MSG)
 
     allocate(edge%putmap(max_neigh_edges,nelemd))
     allocate(edge%getmap(max_neigh_edges,nelemd))
@@ -356,7 +356,7 @@ contains
     getmap2(:,:)=-1
     do ie=1,nelemd
        do i=1,max_neigh_edges
-          edge%reverse(i,ie) = elem(ie)%desc%reverse(i) 
+          edge%reverse(i,ie) = elem(ie)%desc%reverse(i)
        enddo
     enddo
 
@@ -370,16 +370,16 @@ contains
     edge%nInter=nInter
     edge%nIntra=nIntra
 
-    if(nInter>0) then 
-       allocate(edge%rcountsInter(nInter),edge%rdisplsInter(nInter)) 
-       allocate(edge%scountsInter(nInter),edge%sdisplsInter(nInter)) 
+    if(nInter>0) then
+       allocate(edge%rcountsInter(nInter),edge%rdisplsInter(nInter))
+       allocate(edge%scountsInter(nInter),edge%sdisplsInter(nInter))
     endif
     if(nIntra>0) then
        allocate(edge%rcountsIntra(nIntra),edge%rdisplsIntra(nIntra))
        allocate(edge%scountsIntra(nIntra),edge%sdisplsIntra(nIntra))
     endif
 
-    if(nSendCycles>0) then 
+    if(nSendCycles>0) then
        allocate(edge%scountsFull(nSendCycles),edge%sdisplsFull(nSendCycles))
        allocate(edge%Srequest(nSendCycles))
        edge%scountsFull(:) = 0
@@ -394,12 +394,12 @@ contains
     il        = pSchedule%pIndx(j)%edgeid
     ie        = pSchedule%pIndx(j)%elemid
     len       = CalcSegmentLength(pSchedule%pIndx(j),mPattern,nlyr)
-    if (mPattern == HME_MPATTERN_S) then 
-       edge%putmap(il,ie) =elem(ie)%desc%putmapS(il)  
+    if (mPattern == HME_MPATTERN_S) then
+       edge%putmap(il,ie) =elem(ie)%desc%putmapS(il)
     else
-       edge%putmap(il,ie) =elem(ie)%desc%putmapP(il)  
+       edge%putmap(il,ie) =elem(ie)%desc%putmapP(il)
     endif
-    if(nSendCycles>0) then 
+    if(nSendCycles>0) then
         edge%sdisplsFull(icycle) = edge%putmap(il,ie)
         edge%scountsFull(icycle) = len
     endif
@@ -415,7 +415,7 @@ contains
           len     = CalcSegmentLength(pSchedule%pIndx(j),mPattern,nlyr)
           edge%putmap(il,ie) = edge%putmap(ilm1,iem1)+lenm1
           if(mesgid .ne. par%rank) then  ! don't enter if this is a move cycle where (mesgid == par%rank)
-             if(mesgid .ne. dst0) then 
+             if(mesgid .ne. dst0) then
                 icycle=icycle+1
                 if (nSendCycles>0) edge%sdisplsFull(icycle) = edge%putmap(il,ie)
                 dst0=mesgid
@@ -442,7 +442,7 @@ contains
        endif
     enddo
 
-    if (nRecvCycles>0) then 
+    if (nRecvCycles>0) then
        allocate(edge%rcountsFull(nRecvCycles),edge%rdisplsFull(nRecvCycles))
        allocate(edge%getDisplsFull(nRecvCycles),edge%putDisplsFull(nRecvCycles))
        edge%rcountsFull(:) = 0
@@ -459,12 +459,12 @@ contains
     il      = pSchedule%gIndx(j)%edgeid
     ie      = pSchedule%gIndx(j)%elemid
     len     = CalcSegmentLength(pSchedule%gIndx(j),mPattern,nlyr)
-    if (mPattern == HME_MPATTERN_S) then 
-       edge%getmap(il,ie) = elem(ie)%desc%getmapS(il)  
+    if (mPattern == HME_MPATTERN_S) then
+       edge%getmap(il,ie) = elem(ie)%desc%getmapS(il)
     else
-       edge%getmap(il,ie) = elem(ie)%desc%getmapP(il)  
+       edge%getmap(il,ie) = elem(ie)%desc%getmapP(il)
     endif
-    if (nRecvCycles>0) then 
+    if (nRecvCycles>0) then
        edge%rdisplsFull(icycle) = edge%getmap(il,ie)
        edge%rcountsFull(icycle) = len
     endif
@@ -476,10 +476,10 @@ contains
        il = pSchedule%gIndx(j)%edgeid
        ie = pSchedule%gIndx(j)%elemid
        mesgid = pSchedule%gIndx(j)%mesgid
-       if(il>0 .and. ie >0) then 
+       if(il>0 .and. ie >0) then
           len     = CalcSegmentLength(pSchedule%gIndx(j),mPattern,nlyr)
           edge%getmap(il,ie) = edge%getmap(ilm1,iem1)+lenm1
-          if(mesgid .ne. par%rank) then ! don't enter if this is a move cycle where (mesgid == par%rank) 
+          if(mesgid .ne. par%rank) then ! don't enter if this is a move cycle where (mesgid == par%rank)
              if(mesgid .ne. src0) then
                 if (nRecvCycles>0) edge%rdisplsFull(icycle+1) = edge%getmap(il,ie)
                 icycle=icycle+1
@@ -488,23 +488,23 @@ contains
              if (nRecvCycles>0) edge%rcountsFull(icycle) = edge%rcountsFull(icycle)+len
           endif
           ilm1=il
-          iem1=ie 
+          iem1=ie
           lenm1=len
        endif
     enddo
-   
-    
+
+
     !
     ! populate the Inter and Intra node communication data-structures
     !
     icInter=0
     icIntra=0
     do icycle=1,nRecvCycles
-       if(pSchedule%RecvCycle(icycle)%onNode .eqv. .FALSE.) then 
+       if(pSchedule%RecvCycle(icycle)%onNode .eqv. .FALSE.) then
           icInter=icInter+1
           edge%rdisplsInter(icInter)=edge%rdisplsFull(icycle)
           edge%rcountsInter(icInter)=edge%rcountsFull(icycle)
-       else 
+       else
           icIntra=icIntra+1
           edge%rdisplsIntra(icIntra)=edge%rdisplsFull(icycle)
           edge%rcountsIntra(icIntra)=edge%rcountsFull(icycle)
@@ -513,9 +513,9 @@ contains
 
 
     ! Setup the data-structures for the on process moves
-    ! Note that this assumes that the data to move is at 
+    ! Note that this assumes that the data to move is at
     ! the end of the  message buffer.
-    if (nRecvCycles>0) then 
+    if (nRecvCycles>0) then
       moveptr = edge%rdisplsFull(nRecvCycles)+edge%rcountsFull(nRecvCycles)+1
     else
       moveptr = 1
@@ -525,14 +525,14 @@ contains
        il     = pSchedule%gIndx(j)%edgeid
        ie     = pSchedule%gIndx(j)%elemid
        mesgid = pSchedule%gIndx(j)%mesgid
-       if(mesgid == par%rank) then  
+       if(mesgid == par%rank) then
           len     = CalcSegmentLength(pSchedule%gIndx(j),mPattern,nlyr)
           moveLength = moveLength + len
        endif
     enddo
 
     ! decompose the move data between the available threads
-    if(max_num_threads<=0) then 
+    if(max_num_threads<=0) then
        nlen = 1
     else
        if(present(nthreads)) then
@@ -546,30 +546,30 @@ contains
        end if
     end if
     call gbarrier_init(edge%gbarrier, nlen)
-     
+
     allocate(edge%moveLength(nlen))
     allocate(edge%movePtr(nlen))
 
-    if (nlen > 1) then 
+    if (nlen > 1) then
        ! the master thread performs no data movement because it is busy with the
-       ! MPI messaging 
+       ! MPI messaging
        edge%moveLength(1) = -1
        edge%movePtr(1) = 0
-       
+
        ! Calculate the length of the local copy in bndy_exchange
        llen = ceiling(real(moveLength,kind=real_kind)/real(nlen-1,kind=real_kind))
        iptr = moveptr
        mLen = 0
        do i=2,nlen
-         if( (mLen+llen) <= moveLength)  then 
-            tlen = llen 
+         if( (mLen+llen) <= moveLength)  then
+            tlen = llen
          else
-            tlen = moveLength - mLen 
+            tlen = moveLength - mLen
          endif
          edge%moveLength(i) = tlen
          edge%movePtr(i)    = iptr
          iptr = iptr + tlen
-         mLen = mLen + tLen 
+         mLen = mLen + tLen
        enddo
     else
        edge%moveLength(1) = moveLength
@@ -582,7 +582,7 @@ contains
     edge%nlyr=nlyr
     edge%nbuf=nbuf
 
-    allocate(edge%receive(nbuf))   
+    allocate(edge%receive(nbuf))
     allocate(edge%buf(nbuf))
 
     if(edge%bndry_type == HME_BNDRY_GET1 .or. &
@@ -599,18 +599,18 @@ contains
 
        call MPI_Barrier(par%comm,ierr)
        !
-       ! communicate the get displacements 
+       ! communicate the get displacements
        !
        do icycle=1,nSendCycles
           pCycle => pSchedule%SendCycle(icycle)
-          dest    = pCycle%dest - 1 
+          dest    = pCycle%dest - 1
           length  = 1
           tag     = 2017
           call MPI_Isend(edge%sdisplsFull(icycle),length,MPIinteger_t,dest,tag,par%comm,edge%Srequest(icycle),ierr)
        enddo
        do icycle=1,nRecvCycles
           pCycle => pSchedule%RecvCycle(icycle)
-          source  = pCycle%source - 1 
+          source  = pCycle%source - 1
           length  = 1
           tag     = 2017
           call MPI_Irecv(edge%getDisplsFull(icycle),length,MPIinteger_t,source,tag,par%comm,edge%Rrequest(icycle),ierr)
@@ -629,7 +629,7 @@ contains
     if(Debug) write(*,21) par%rank, ' destFull: ',Schedule(1)%destFull
     if(Debug) write(*,21) par%rank, ' srcFull: ',Schedule(1)%srcFull
 
-    
+
     if(edge%bndry_type == HME_BNDRY_PUT1 .or. &
        edge%bndry_type == HME_BNDRY_PUT2 ) then
        ! setup the main one-sided window
@@ -645,18 +645,18 @@ contains
        call MPI_Barrier(par%comm,ierr)
        !
        !
-       ! communicate the put displacements 
+       ! communicate the put displacements
        !
        do icycle=1,nRecvCycles
           pCycle => pSchedule%RecvCycle(icycle)
-          source    = pCycle%source - 1 
+          source    = pCycle%source - 1
           length  = 1
           tag     = 2018
           call MPI_Isend(edge%rdisplsFull(icycle),length,MPIinteger_t,source,tag,par%comm,edge%Srequest(icycle),ierr)
        enddo
        do icycle=1,nSendCycles
           pCycle => pSchedule%SendCycle(icycle)
-          dest  = pCycle%dest - 1 
+          dest  = pCycle%dest - 1
           length  = 1
           tag     = 2018
           call MPI_Irecv(edge%putDisplsFull(icycle),length,MPIinteger_t,dest,tag,par%comm,edge%Rrequest(icycle),ierr)
@@ -680,11 +680,11 @@ contains
 
 !    call t_adj_detailf(-3)
 
-   
+
 
   end subroutine initEdgeBuffer_r8
 
-  integer function CalcSegmentLength(pgIndx,mPattern,nlyr) result(len) 
+  integer function CalcSegmentLength(pgIndx,mPattern,nlyr) result(len)
 
      type(pgindex_t) ::  pgIndx
      integer, intent(in) :: mPattern
@@ -695,9 +695,9 @@ contains
 !     integer, parameter :: alignment=2  ! align on 2 word boundaries
 !     integer, parameter :: alignment=8  ! align on 8 word boundaries
 
-     
+
      select case(mPattern)
-        CASE(HME_MPATTERN_S) 
+        CASE(HME_MPATTERN_S)
            len = nlyr*pgIndx%lenS
         CASE(HME_MPATTERN_P)
            len = nlyr*pgIndx%lenP
@@ -705,12 +705,12 @@ contains
            len = nlyr*pgIndx%lenP
      end select
      rem = MODULO(len,alignment)
-     if(rem .ne. 0) then 
+     if(rem .ne. 0) then
         len = len + (alignment-rem)
      endif
-        
 
-  end function calcSegmentLength 
+
+  end function calcSegmentLength
   ! =========================================
   ! initEdgeBuffer_l8:
   !
@@ -755,7 +755,7 @@ contains
     integer,              intent(in)   :: ielem
 
     ! =========================================
-    ! This code is just a wrapper call the 
+    ! This code is just a wrapper call the
     !   normal oldedgeVpack
     ! =========================================
     call edgeVpack(edge,v,vlyr,kptr,ielem)
@@ -789,22 +789,22 @@ contains
     if(associated(edge%rdisplsFull)) deallocate(edge%rdisplsFull)
 !    print *,'before {Intra,Inter}-node data-structures'
 
-    ! Intra-node MPI Communication 
-    if(edge%nIntra>0) then 
+    ! Intra-node MPI Communication
+    if(edge%nIntra>0) then
       if(associated(edge%rcountsIntra)) deallocate(edge%rcountsIntra)
       if(associated(edge%scountsIntra)) deallocate(edge%scountsIntra)
       if(associated(edge%sdisplsIntra)) deallocate(edge%sdisplsIntra)
       if(associated(edge%rdisplsIntra)) deallocate(edge%rdisplsIntra)
     endif
 
-    ! Inter-node MPI Communication 
-    if(edge%nInter>0) then 
+    ! Inter-node MPI Communication
+    if(edge%nInter>0) then
       if(associated(edge%rcountsInter)) deallocate(edge%rcountsInter)
       if(associated(edge%scountsInter)) deallocate(edge%scountsInter)
       if(associated(edge%sdisplsInter)) deallocate(edge%sdisplsInter)
       if(associated(edge%rdisplsInter)) deallocate(edge%rdisplsInter)
     endif
-    
+
 !    print *,'after {Intra,Inter}-node data-structures'
     deallocate(edge%rRequest,edge%sRequest,edge%status)
 !    Print *,'FIXME: need to deallocate barrier specific data-structures'
@@ -813,8 +813,8 @@ contains
 
   end subroutine FreeEdgeBuffer_r8
 
-  subroutine FreeGhostBuffer3D(buffer) 
-    use edgetype_mod, only : ghostbuffer3d_t 
+  subroutine FreeGhostBuffer3D(buffer)
+    use edgetype_mod, only : ghostbuffer3d_t
     implicit none
     type (Ghostbuffer3d_t),intent(inout) :: buffer
 
@@ -832,7 +832,7 @@ contains
   !
   !  Freed an edge communication buffer
   ! =========================================
-  subroutine FreeEdgeBuffer_i8(edge) 
+  subroutine FreeEdgeBuffer_i8(edge)
     implicit none
     type (LongEdgeBuffer_t),intent(inout) :: edge
 
@@ -847,16 +847,16 @@ contains
   !
   !> @brief Pack edges of v into an edge buffer for boundary exchange.
   !
-  !> This subroutine packs for one or more vertical layers into an edge 
-  !! buffer. If the buffer associated with edge is not large enough to 
-  !! hold all vertical layers you intent to pack, the method will 
+  !> This subroutine packs for one or more vertical layers into an edge
+  !! buffer. If the buffer associated with edge is not large enough to
+  !! hold all vertical layers you intent to pack, the method will
   !! halt the program with a call to parallel_mod::haltmp().
   !! @param[in] edge Edge Buffer into which the data will be packed.
   !! This buffer must be previously allocated with initEdgeBuffer().
   !! @param[in] v The data to be packed.
   !! @param[in] vlyr Number of vertical level coming into the subroutine
   !! for packing for input v.
-  !! @param[in] kptr Vertical pointer to the place in the edge buffer where 
+  !! @param[in] kptr Vertical pointer to the place in the edge buffer where
   !! data will be located.
   ! =========================================
   subroutine edgeVpack(edge,v,vlyr,kptr,ielem)
@@ -1005,6 +1005,153 @@ contains
 
   end subroutine edgeVpack
 
+  !!!!!!!!!!!    this subroutine is just for debug !!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine edgeVpack_debug(edge,v,vlyr,kptr,ielem)
+    use dimensions_mod, only : np, max_corner_elem
+    use control_mod, only : north, south, east, west, neast, nwest, seast, swest
+
+    type (EdgeBuffer_t)                :: edge
+    integer,              intent(in)   :: vlyr
+    real (kind=real_kind),intent(in)   :: v(np,np,vlyr)
+    integer,              intent(in)   :: kptr
+    integer,              intent(in)   :: ielem
+!    type (EdgeDescriptor_t),intent(in) :: desc
+
+    ! Local variables
+    integer :: i,k,ir,ll,iptr
+
+    integer :: is,ie,in,iw,edgeptr
+
+
+    is = edge%putmap(south,ielem)
+    ie = edge%putmap(east,ielem)
+    in = edge%putmap(north,ielem)
+    iw = edge%putmap(west,ielem)
+    if (edge%nlyr < (kptr+vlyr) ) then
+       print *,'edge%nlyr = ',edge%nlyr
+       print *,'kptr+vlyr = ',kptr+vlyr
+       call haltmp('edgeVpack: Buffer overflow: size of the vertical dimension must be increased!')
+    endif
+!JMD    call t_adj_detailf(+2)
+!dir$ ivdep
+    do k=1,vlyr
+       iptr = np*(kptr+k-1)
+!DIR$ UNROLL(NP)
+       do i=1,np
+          !edge%buf(iptr+ie+i)   = v(np ,i ,k) ! East
+          !edge%buf(iptr+is+i)   = v(i  ,1 ,k) ! South
+          !edge%buf(iptr+in+i)   = v(i  ,np,k) ! North
+          !edge%buf(iptr+iw+i)   = v(1  ,i ,k) ! West
+       enddo
+    enddo
+
+    !  This is really kludgy way to setup the index reversals
+    !  But since it is so a rare event not real need to spend time optimizing
+
+    !if(edge%reverse(south,ielem)) then
+    !   do k=1,vlyr
+    !      iptr = np*(kptr+k-1)+is
+    !      do i=1,np
+    !         ir = np-i+1
+    !         edge%buf(iptr+ir)=v(i,1,k)
+    !      enddo
+    !   enddo
+    !endif
+
+    !if(edge%reverse(east,ielem)) then
+    !   do k=1,vlyr
+    !      iptr=np*(kptr+k-1)+ie
+    !      do i=1,np
+    !         ir = np-i+1
+    !         edge%buf(iptr+ir)=v(np,i,k)
+    !      enddo
+    !   enddo
+    !endif
+
+    !if(edge%reverse(north,ielem)) then
+    !   do k=1,vlyr
+    !      iptr=np*(kptr+k-1)+in
+    !      do i=1,np
+    !         ir = np-i+1
+    !         edge%buf(iptr+ir)=v(i,np,k)
+    !      enddo
+    !   enddo
+    !endif
+
+    !if(edge%reverse(west,ielem)) then
+    !   do k=1,vlyr
+    !      iptr=np*(kptr+k-1)+iw
+    !      do i=1,np
+    !         ir = np-i+1
+    !         edge%buf(iptr+ir)=v(1,i,k)
+    !      enddo
+    !   enddo
+    !endif
+
+! SWEST
+    !do ll=swest,swest+max_corner_elem-1
+    !    if (edge%putmap(ll,ielem) /= -1) then
+    !        edgeptr = edge%putmap(ll,ielem)+1
+    !        do k=1,vlyr
+    !            iptr = (kptr+k-1)+edgeptr
+    !            if (iptr > size(edge%buf)) then
+    !               write(6, *) 'ERROR SW: ',size(edge%buf),iptr,edge%putmap(ll,ielem)
+    !               call abortmp('pointer bounds ERROR SW')
+    !            end if
+    !            edge%buf(iptr) = v(1, 1, k)
+    !        end do
+    !    end if
+    !end do
+
+! SEAST
+    !do ll=swest+max_corner_elem,swest+2*max_corner_elem-1
+    !    if (edge%putmap(ll,ielem) /= -1) then
+    !        edgeptr = edge%putmap(ll,ielem)+1
+    !        do k=1,vlyr
+    !           iptr = (kptr+k-1)+edgeptr
+    !           if (iptr > size(edge%buf)) then
+    !              write(6, *) 'ERROR SE: ',size(edge%buf),iptr,edge%putmap(ll,ielem)
+    !              call abortmp('pointer bounds ERROR SE')
+    !           end if
+    !           edge%buf(iptr)=v(np, 1, k)
+    !        end do
+    !    end if
+    !end do
+
+! NEAST
+    !do ll=swest+3*max_corner_elem,swest+4*max_corner_elem-1
+    !    if (edge%putmap(ll,ielem) /= -1) then
+    !        edgeptr = edge%putmap(ll,ielem)+1
+    !        do k=1,vlyr
+    !           iptr = (kptr+k-1)+edgeptr
+    !           if (iptr > size(edge%buf)) then
+    !              write(6, *) 'ERROR NE: ',size(edge%buf),iptr,edge%putmap(ll,ielem)
+    !              call abortmp('pointer bounds ERROR NE')
+    !           end if
+    !           edge%buf(iptr) = v(np, np, k)
+    !        end do
+    !    end if
+    !end do
+
+! NWEST
+    !do ll=swest+2*max_corner_elem,swest+3*max_corner_elem-1
+    !    if (edge%putmap(ll,ielem) /= -1) then
+    !        edgeptr = edge%putmap(ll,ielem)+1
+    !        do k=1,vlyr
+    !           iptr = (kptr+k-1)+edgeptr
+    !           if (iptr > size(edge%buf)) then
+    !              write(6, *) 'ERROR NW: ',size(edge%buf),iptr,edge%putmap(ll,ielem)
+    !              call abortmp('pointer bounds ERROR NW')
+    !           end if
+    !           edge%buf(iptr) = v(1, np, k)
+    !        end do
+    !    end if
+    !end do
+
+!JMD    call t_adj_detailf(-2)
+
+end subroutine edgeVpack_debug
+
   subroutine edgeSpack_r8(edge,v,vlyr,kptr,ielem)
     use dimensions_mod, only : np, max_corner_elem
     use control_mod, only : north, south, east, west, neast, nwest, seast, swest
@@ -1116,7 +1263,7 @@ contains
     in = desc%putmapP(north)
     iw = desc%putmapP(west)
 
-    if(MODULO(np,2) == 0 .and. UseUnroll) then 
+    if(MODULO(np,2) == 0 .and. UseUnroll) then
        do k=1,vlyr
           do i=1,np,2
              edge%buf(kptr+k,is+i)   = v(i  ,1 ,k)
@@ -1253,16 +1400,16 @@ contains
  ! ks = 1
  ! kblock = 52
  ! ke = min(vlyr,kblock)
- ! do while ((ke<=vlyr) .and. (.not. ks>vlyr)) 
-!    if((ielem==1) .and. (iam ==1)) then 
+ ! do while ((ke<=vlyr) .and. (.not. ks>vlyr))
+!    if((ielem==1) .and. (iam ==1)) then
 !       print *,'edgeVunpack: ks,ke ',ks,ke
 !    endif
 
 !    nb=ceiling(real(vlyr,kind=real_kind)/real(kblock,kind=real_kind))
 
-    
-!    if((ielem==1) .and. (iam == 1)) then 
-!       print *,'edgeVunpack: vlyr:= ',vlyr 
+
+!    if((ielem==1) .and. (iam == 1)) then
+!       print *,'edgeVunpack: vlyr:= ',vlyr
 !    endif
 
 !dir$ ivdep
@@ -1279,7 +1426,7 @@ contains
 
 ! SWEST
     do ll=swest,swest+max_corner_elem-1
-        if(edge%getmap(ll,ielem) /= -1) then 
+        if(edge%getmap(ll,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,1 ,k)=v(1 ,1 ,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
             enddo
@@ -1288,7 +1435,7 @@ contains
 
 ! SEAST
     do ll=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(edge%getmap(ll,ielem) /= -1) then 
+        if(edge%getmap(ll,ielem) /= -1) then
             do k=1,vlyr
                 v(np ,1 ,k)=v(np,1 ,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
             enddo
@@ -1297,7 +1444,7 @@ contains
 
 ! NEAST
     do ll=swest+3*max_corner_elem,swest+4*max_corner_elem-1
-        if(edge%getmap(ll,ielem) /= -1) then 
+        if(edge%getmap(ll,ielem) /= -1) then
             do k=1,vlyr
                 v(np ,np,k)=v(np,np,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
             enddo
@@ -1306,7 +1453,7 @@ contains
 
 ! NWEST
     do ll=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(edge%getmap(ll,ielem) /= -1) then 
+        if(edge%getmap(ll,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,np,k)=v(1 ,np,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
             enddo
@@ -1322,6 +1469,104 @@ contains
 !JMD    call t_adj_detailf(-2)
 
   end subroutine edgeVunpack
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! only for debug !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine edgeVunpack_debug(edge,v,vlyr,kptr,ielem)
+    use dimensions_mod, only : np, max_corner_elem
+    use control_mod, only : north, south, east, west, neast, nwest, seast, swest
+    type (EdgeBuffer_t),         intent(in)  :: edge
+
+    integer,               intent(in)  :: vlyr
+    real (kind=real_kind), intent(inout) :: v(np,np,vlyr)
+!$dir assume_aligned v:64
+    integer,               intent(in)  :: kptr
+    integer,               intent(in)  :: ielem
+    !type (EdgeDescriptor_t)            :: desc
+
+    ! Local
+    integer :: i,k,ll,iptr
+    integer :: is,ie,in,iw
+    integer :: ks,ke,kblock
+    logical :: done
+
+!JMD    call t_adj_detailf(+2)
+
+    is=edge%getmap(south,ielem)
+    ie=edge%getmap(east,ielem)
+    in=edge%getmap(north,ielem)
+    iw=edge%getmap(west,ielem)
+
+ ! ks = 1
+ ! kblock = 52
+ ! ke = min(vlyr,kblock)
+ ! do while ((ke<=vlyr) .and. (.not. ks>vlyr))
+!    if((ielem==1) .and. (iam ==1)) then
+!       print *,'edgeVunpack: ks,ke ',ks,ke
+!    endif
+
+!    nb=ceiling(real(vlyr,kind=real_kind)/real(kblock,kind=real_kind))
+
+
+!    if((ielem==1) .and. (iam == 1)) then
+!       print *,'edgeVunpack: vlyr:= ',vlyr
+!    endif
+
+!dir$ ivdep
+    do k=1,vlyr
+       iptr=np*(kptr+k-1)
+!DIR$ UNROLL(NP)
+       do i=1,np
+          v(np ,i  ,k) = v(np ,i  ,k)+edge%receive(iptr+i+ie) ! East
+          v(i  ,1  ,k) = v(i  ,1  ,k)+edge%receive(iptr+i+is) ! South
+          v(i  ,np ,k) = v(i  ,np ,k)+edge%receive(iptr+i+in) ! North
+          v(1  ,i  ,k) = v(1  ,i  ,k)+edge%receive(iptr+i+iw) ! West
+       enddo
+    end do
+
+! SWEST
+    do ll=swest,swest+max_corner_elem-1
+        if(edge%getmap(ll,ielem) /= -1) then
+            do k=1,vlyr
+                v(1  ,1 ,k)=v(1 ,1 ,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
+            enddo
+        endif
+    end do
+
+! SEAST
+    do ll=swest+max_corner_elem,swest+2*max_corner_elem-1
+        if(edge%getmap(ll,ielem) /= -1) then
+            do k=1,vlyr
+                v(np ,1 ,k)=v(np,1 ,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
+            enddo
+        endif
+    end do
+
+! NEAST
+    do ll=swest+3*max_corner_elem,swest+4*max_corner_elem-1
+        if(edge%getmap(ll,ielem) /= -1) then
+            do k=1,vlyr
+                v(np ,np,k)=v(np,np,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
+            enddo
+        endif
+    end do
+
+! NWEST
+    do ll=swest+2*max_corner_elem,swest+3*max_corner_elem-1
+        if(edge%getmap(ll,ielem) /= -1) then
+            do k=1,vlyr
+                v(1  ,np,k)=v(1 ,np,k)+edge%receive((kptr+k-1)+edge%getmap(ll,ielem)+1)
+            enddo
+        endif
+    end do
+!    ks = ke+1
+!    ke = ke+kblock
+!    if(ke>vlyr) then
+!       ke=vlyr
+!    endif
+! enddo
+
+!JMD    call t_adj_detailf(-2)
+
+end subroutine edgeVunpack_debug
 !
   subroutine edgeVunpackVert(edge,v,ielem)
     use control_mod, only : north, south, east, west, neast, nwest, seast, swest
@@ -1358,47 +1603,47 @@ contains
        ! North
        ! kptr = 0
        ! iptr=np*(kptr+k-1)+in
-  
-!      iptr = np*(1-1)+in 
-!      v(3,i ,np)%x = edge%receive(1,in+i) 
-       v(3,i ,np)%x = edge%receive(in+i) 
 
-!      iptr = np*(2-1)+in 
-!      v(3,i ,np)%y = edge%receive(2,in+i) 
-       v(3,i ,np)%y = edge%receive(np+in+i) 
+!      iptr = np*(1-1)+in
+!      v(3,i ,np)%x = edge%receive(1,in+i)
+       v(3,i ,np)%x = edge%receive(in+i)
 
-!      iptr = np*(3-1)+in 
-!      v(3,i ,np)%z = edge%receive(3,in+i) 
-       v(3,i ,np)%z = edge%receive(2*np+in+i) 
+!      iptr = np*(2-1)+in
+!      v(3,i ,np)%y = edge%receive(2,in+i)
+       v(3,i ,np)%y = edge%receive(np+in+i)
+
+!      iptr = np*(3-1)+in
+!      v(3,i ,np)%z = edge%receive(3,in+i)
+       v(3,i ,np)%z = edge%receive(2*np+in+i)
 
        ! South
-       ! v(2,i ,1)%x  = edge%receive(1,is+i) 
-       v(2,i ,1)%x  = edge%receive(is+i) 
+       ! v(2,i ,1)%x  = edge%receive(1,is+i)
+       v(2,i ,1)%x  = edge%receive(is+i)
 
-       ! v(2,i ,1)%y  = edge%receive(2,is+i) 
-       v(2,i ,1)%y  = edge%receive(np+is+i) 
+       ! v(2,i ,1)%y  = edge%receive(2,is+i)
+       v(2,i ,1)%y  = edge%receive(np+is+i)
 
-       ! v(2,i ,1)%z  = edge%receive(3,is+i) 
-       v(2,i ,1)%z  = edge%receive(2*np+is+i) 
+       ! v(2,i ,1)%z  = edge%receive(3,is+i)
+       v(2,i ,1)%z  = edge%receive(2*np+is+i)
     enddo
 
     do i=np/2+1,np
        ! North
-       ! v(4,i ,np)%x = edge%receive(1,in+i) 
-       v(4,i ,np)%x = edge%receive(in+i) 
+       ! v(4,i ,np)%x = edge%receive(1,in+i)
+       v(4,i ,np)%x = edge%receive(in+i)
 
-       ! v(4,i ,np)%y = edge%receive(2,in+i) 
-       v(4,i ,np)%y = edge%receive(np+in+i) 
+       ! v(4,i ,np)%y = edge%receive(2,in+i)
+       v(4,i ,np)%y = edge%receive(np+in+i)
 
-       ! v(4,i ,np)%z = edge%receive(3,in+i) 
-       v(4,i ,np)%z = edge%receive(2*np+in+i) 
+       ! v(4,i ,np)%z = edge%receive(3,in+i)
+       v(4,i ,np)%z = edge%receive(2*np+in+i)
        ! South
-       ! v(1,i ,1)%x  = edge%receive(1,is+i) 
-       v(1,i ,1)%x  = edge%receive(is+i) 
-       ! v(1,i ,1)%y  = edge%receive(2,is+i) 
-       v(1,i ,1)%y  = edge%receive(np+is+i) 
-       ! v(1,i ,1)%z  = edge%receive(3,is+i)        
-       v(1,i ,1)%z  = edge%receive(2*np+is+i)        
+       ! v(1,i ,1)%x  = edge%receive(1,is+i)
+       v(1,i ,1)%x  = edge%receive(is+i)
+       ! v(1,i ,1)%y  = edge%receive(2,is+i)
+       v(1,i ,1)%y  = edge%receive(np+is+i)
+       ! v(1,i ,1)%z  = edge%receive(3,is+i)
+       v(1,i ,1)%z  = edge%receive(2*np+is+i)
     enddo
 
     do i=1,np/2
@@ -1407,8 +1652,8 @@ contains
        v(3,np,i)%x = edge%receive(ie+i)
        ! v(3,np,i)%y = edge%receive(2,ie+i)
        v(3,np,i)%y = edge%receive(np+ie+i)
-       ! v(3,np,i)%z = edge%receive(3,ie+i)       
-       v(3,np,i)%z = edge%receive(2*np+ie+i)       
+       ! v(3,np,i)%z = edge%receive(3,ie+i)
+       v(3,np,i)%z = edge%receive(2*np+ie+i)
        ! West
        ! v(4,1,i)%x  = edge%receive(1,iw+i)
        v(4,1,i)%x  = edge%receive(iw+i)
@@ -1426,8 +1671,8 @@ contains
        ! v(2,np,i)%y = edge%receive(2,ie+i)
        v(2,np,i)%y = edge%receive(np+ie+i)
 
-       ! v(2,np,i)%z = edge%receive(3,ie+i)       
-       v(2,np,i)%z = edge%receive(2*np+ie+i)       
+       ! v(2,np,i)%z = edge%receive(3,ie+i)
+       v(2,np,i)%z = edge%receive(2*np+ie+i)
        ! West
 
        ! v(1,1,i)%x  = edge%receive(1,iw+i)
@@ -1445,14 +1690,14 @@ contains
     do l=swest,swest+max_corner_elem-1
        ! find the one active corner, then exist
         isw=edge%getmap(l,ielem)
-        if(isw /= -1) then 
+        if(isw /= -1) then
             ! v(1,1,1)%x=edge%receive(1,desc%getmapP(l)+1)
             v(1,1,1)%x=edge%receive(isw+1)
             ! v(1,1,1)%y=edge%receive(2,desc%getmapP(l)+1)
             v(1,1,1)%y=edge%receive(nce+isw+1)
             ! v(1,1,1)%z=edge%receive(3,desc%getmapP(l)+1)
             v(1,1,1)%z=edge%receive(2*nce+isw+1)
-            exit 
+            exit
         else
             v(1,1,1)%x=0_real_kind
             v(1,1,1)%y=0_real_kind
@@ -1464,7 +1709,7 @@ contains
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ! find the one active corner, then exist
         ise=edge%getmap(l,ielem)
-        if(ise /= -1) then 
+        if(ise /= -1) then
             ! v(2,np,1)%x=edge%receive(1,desc%getmapP(l)+1)
             v(2,np,1)%x=edge%receive(ise+1)
             ! v(2,np,1)%y=edge%receive(2,desc%getmapP(l)+1)
@@ -1483,7 +1728,7 @@ contains
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ! find the one active corner, then exist
         ine=edge%getmap(l,ielem)
-        if(ine /= -1) then 
+        if(ine /= -1) then
             v(3,np,np)%x=edge%receive(ine+1)
             v(3,np,np)%y=edge%receive(nce+ine+1)
             v(3,np,np)%z=edge%receive(2*nce+ine+1)
@@ -1499,7 +1744,7 @@ contains
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        ! find the one active corner, then exist
         inw = edge%getmap(l,ielem)
-        if(inw/= -1) then 
+        if(inw/= -1) then
             v(4,1,np)%x=edge%receive(inw+1)
             v(4,1,np)%y=edge%receive(nce+inw+1)
             v(4,1,np)%z=edge%receive(2*nce+inw+1)
@@ -1515,22 +1760,22 @@ contains
 
     do i=2,np/2
        ! North
-       v(4,i ,np)%x = v(3,i-1 ,np)%x 
+       v(4,i ,np)%x = v(3,i-1 ,np)%x
        v(4,i ,np)%y = v(3,i-1 ,np)%y
        v(4,i ,np)%z = v(3,i-1 ,np)%z
        ! South
-       v(1,i ,1)%x  = v(2,i-1 ,1)%x 
-       v(1,i ,1)%y  = v(2,i-1 ,1)%y 
-       v(1,i ,1)%z  = v(2,i-1 ,1)%z 
+       v(1,i ,1)%x  = v(2,i-1 ,1)%x
+       v(1,i ,1)%y  = v(2,i-1 ,1)%y
+       v(1,i ,1)%z  = v(2,i-1 ,1)%z
     enddo
 
     do i=np/2+1,np-1
        ! North
-       v(3,i ,np)%x = v(4,i+1 ,np)%x 
+       v(3,i ,np)%x = v(4,i+1 ,np)%x
        v(3,i ,np)%y = v(4,i+1 ,np)%y
        v(3,i ,np)%z = v(4,i+1 ,np)%z
        ! South
-       v(2,i ,1)%x  = v(1,i+1 ,1)%x 
+       v(2,i ,1)%x  = v(1,i+1 ,1)%x
        v(2,i ,1)%y  = v(1,i+1 ,1)%y
        v(2,i ,1)%z  = v(1,i+1 ,1)%z
     enddo
@@ -1548,11 +1793,11 @@ contains
 
     do i=np/2+1,np-1
        ! East
-       v(3,np,i)%x = v(2,np,i+1)%x 
+       v(3,np,i)%x = v(2,np,i+1)%x
        v(3,np,i)%y = v(2,np,i+1)%y
        v(3,np,i)%z = v(2,np,i+1)%z
        ! West
-       v(4,1,i)%x  = v(1,1,i+1)%x 
+       v(4,1,i)%x  = v(1,1,i+1)%x
        v(4,1,i)%y  = v(1,1,i+1)%y
        v(4,1,i)%z  = v(1,1,i+1)%z
     end do
@@ -1598,28 +1843,28 @@ contains
     i = swest
     if(edge%getmap(i,ielem) /= -1) then
       do k=1,vlyr
-        iptr=(kptr+k-1)   
+        iptr=(kptr+k-1)
         v(0,0,k) = edge%receive(iptr+edge%getmap(i,ielem)+1)
       end do
     end if
     i = swest+max_corner_elem
     if(edge%getmap(i,ielem) /= -1) then
       do k=1,vlyr
-        iptr=(kptr+k-1)   
+        iptr=(kptr+k-1)
         v(np+1,0,k) = edge%receive(iptr+edge%getmap(i,ielem)+1)
       end do
     end if
     i = swest+3*max_corner_elem
     if(edge%getmap(i,ielem) /= -1) then
       do k=1,vlyr
-        iptr=(kptr+k-1)   
+        iptr=(kptr+k-1)
         v(np+1,np+1,k) = edge%receive(iptr+edge%getmap(i,ielem)+1)
       end do
     end if
     i = swest+2*max_corner_elem
     if(edge%getmap(i,ielem) /= -1) then
       do k=1,vlyr
-        iptr=(kptr+k-1)   
+        iptr=(kptr+k-1)
         v(0,np+1,k) = edge%receive(iptr+edge%getmap(i,ielem)+1)
       end do
     end if
@@ -1665,7 +1910,7 @@ contains
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,1 ,k)=MAX(v(1 ,1 ,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
@@ -1674,7 +1919,7 @@ contains
 
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(np ,1 ,k)=MAX(v(np,1 ,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
@@ -1692,13 +1937,13 @@ contains
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,np,k)=MAX(v(1 ,np,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
         endif
     end do
-    
+
   end subroutine edgeVunpackMAX
 
   subroutine edgeSunpackMAX(edge,v,vlyr,kptr,ielem)
@@ -1730,7 +1975,7 @@ contains
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MAX(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
@@ -1740,7 +1985,7 @@ contains
 
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MAX(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
@@ -1760,14 +2005,14 @@ contains
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MAX(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
             enddo
         endif
     end do
-    
+
   end subroutine edgeSunpackMAX
 
   subroutine edgeSunpackMIN(edge,v,vlyr,kptr,ielem)
@@ -1799,7 +2044,7 @@ contains
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MiN(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
@@ -1809,7 +2054,7 @@ contains
 
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MIN(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
@@ -1829,14 +2074,14 @@ contains
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 iptr = (kptr+k-1)
                 v(k)=MIN(v(k),edge%receive(iptr+edge%getmap(l,ielem)+1))
             enddo
         endif
     end do
-    
+
   end subroutine edgeSunpackMIN
 
   subroutine edgeVunpackMIN(edge,v,vlyr,kptr,ielem)
@@ -1873,7 +2118,7 @@ contains
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,1 ,k)=MIN(v(1 ,1 ,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
@@ -1882,7 +2127,7 @@ contains
 
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(np ,1 ,k)=MIN(v(np,1 ,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
@@ -1891,7 +2136,7 @@ contains
 
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(np ,np,k)=MIN(v(np,np,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
@@ -1900,13 +2145,13 @@ contains
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(edge%getmap(l,ielem) /= -1) then 
+        if(edge%getmap(l,ielem) /= -1) then
             do k=1,vlyr
                 v(1  ,np,k)=MIN(v(1 ,np,k),edge%receive((kptr+k-1)+edge%getmap(l,ielem)+1))
             enddo
         endif
     end do
-    
+
   end subroutine edgeVunpackMIN
   ! ========================================
   ! LongEdgeVunpackMIN:
@@ -1947,7 +2192,7 @@ contains
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-        if(desc%getmapP(l) /= -1) then 
+        if(desc%getmapP(l) /= -1) then
             do k=1,vlyr
                 v(1  ,1 ,k)=MIN(v(1 ,1 ,k),edge%buf(kptr+k,desc%getmapP(l)+1))
             enddo
@@ -1956,7 +2201,7 @@ contains
 
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
-        if(desc%getmapP(l) /= -1) then 
+        if(desc%getmapP(l) /= -1) then
             do k=1,vlyr
                 v(np ,1 ,k)=MIN(v(np,1 ,k),edge%buf(kptr+k,desc%getmapP(l)+1))
             enddo
@@ -1965,7 +2210,7 @@ contains
 
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
-        if(desc%getmapP(l) /= -1) then 
+        if(desc%getmapP(l) /= -1) then
             do k=1,vlyr
                 v(np ,np,k)=MIN(v(np,np,k),edge%buf(kptr+k,desc%getmapP(l)+1))
             enddo
@@ -1974,7 +2219,7 @@ contains
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
-        if(desc%getmapP(l) /= -1) then 
+        if(desc%getmapP(l) /= -1) then
             do k=1,vlyr
                 v(1  ,np,k)=MIN(v(1 ,np,k),edge%buf(kptr+k,desc%getmapP(l)+1))
             enddo
@@ -2003,7 +2248,7 @@ contains
     real(kind=real_kind), dimension(:,:,:), pointer :: R
     real(kind=real_kind)  :: tmp1,tmp2
 
-    print *,'entered into edgerotate... Note that this code is currently not functional' 
+    print *,'entered into edgerotate... Note that this code is currently not functional'
     stop 'ERROR: edgerotate'
 #ifdef _USEASSOCIATED
     if (associated(rot)) then
@@ -2069,13 +2314,13 @@ contains
      ! buffermap:
      !
      ! buffermap translates element number, inum and
-     ! element edge/corner, facet, into an edge buffer 
+     ! element edge/corner, facet, into an edge buffer
      ! memory location, loc.
      ! =============================================
 
      function buffermap(inum,facet) result(loc)
        use dimensions_mod, only : np
-       integer, intent(in) :: inum   
+       integer, intent(in) :: inum
        integer, intent(in) :: facet
        integer :: loc
 
@@ -2096,8 +2341,8 @@ contains
   !  Author: Christoph Erath, Mark Taylor
   !  Freed an ghostpoints communication buffer
   ! =========================================
-  subroutine FreeGhostBufferTR(ghost) 
-    use edgetype_mod, only : GhostBuffertr_t 
+  subroutine FreeGhostBufferTR(ghost)
+    use edgetype_mod, only : GhostBuffertr_t
     implicit none
     type (GhostBuffertr_t),intent(inout) :: ghost
 
@@ -2109,23 +2354,23 @@ contains
     deallocate(ghost%receive)
 !$OMP END MASTER
 
-  end subroutine FreeGhostBufferTR 
+  end subroutine FreeGhostBufferTR
   ! =========================================
 
   ! =========================================
   !
   !> @brief Pack edges of v into an edge buffer for boundary exchange.
   !
-  !> This subroutine packs for one or more vertical layers into an edge 
-  !! buffer. If the buffer associated with edge is not large enough to 
-  !! hold all vertical layers you intent to pack, the method will 
+  !> This subroutine packs for one or more vertical layers into an edge
+  !! buffer. If the buffer associated with edge is not large enough to
+  !! hold all vertical layers you intent to pack, the method will
   !! halt the program with a call to parallel_mod::haltmp().
   !! @param[in] edge Ghost Buffer into which the data will be packed.
   !! This buffer must be previously allocated with initghostbufferfull().
   !! @param[in] v The data to be packed.
   !! @param[in] vlyr Number of vertical level coming into the subroutine
   !! for packing for input v.
-  !! @param[in] kptr Vertical pointer to the place in the edge buffer where 
+  !! @param[in] kptr Vertical pointer to the place in the edge buffer where
   !! data will be located.
   ! =========================================
   subroutine GhostVpackfull(edge,v,nc1,nc2,nc,vlyr,kptr,desc)
@@ -2134,7 +2379,7 @@ contains
     use control_mod, only : north, south, east, west, neast, nwest, seast, swest
     use edgetype_mod, only : ghostbuffer3d_t
 
-    implicit none 
+    implicit none
     type (Ghostbuffer3D_t)                      :: edge
     integer,              intent(in)   :: vlyr
     integer,              intent(in)   :: nc1,nc2,nc,kptr
@@ -2151,11 +2396,11 @@ contains
        threadsafe=.true.
     end if
     ! Example convenction for buffer to the north:
-    !  buf(:,,:,i,e) 
-    !   each "edge" is a row of data (i=1,np) in the element 
+    !  buf(:,,:,i,e)
+    !   each "edge" is a row of data (i=1,np) in the element
     !     north most row of data goes into e=1
     !     next row of data goes into e=2
-    !     .... 
+    !     ....
     !     south most row of data goes into e=np
     !   We need to pack this way to preserve the orientation
     !   so the data can be unpacked correctly
@@ -2163,10 +2408,10 @@ contains
     ! note: we think of buf as dimensioned buf(k,is,i,e)
     ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
     !
-    is = desc%putmapP_ghost(south) 
-    ie = desc%putmapP_ghost(east)  
-    in = desc%putmapP_ghost(north) 
-    iw = desc%putmapP_ghost(west)  
+    is = desc%putmapP_ghost(south)
+    ie = desc%putmapP_ghost(east)
+    in = desc%putmapP_ghost(north)
+    iw = desc%putmapP_ghost(west)
 #if 1
     if (is>edge%nbuf) call abortmp('error is=')
     if (ie>edge%nbuf) call abortmp('error ie=')
@@ -2256,7 +2501,7 @@ contains
           end do
        end if
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem, swest+2*max_corner_elem-1
        if (desc%putmapP_ghost(l) /= -1) then
@@ -2267,7 +2512,7 @@ contains
           end do
        end if
     end do
-    
+
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        if (desc%putmapP_ghost(l) /= -1) then
@@ -2280,7 +2525,7 @@ contains
              end do
           end if
     end do
-    
+
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        if (desc%putmapP_ghost(l) /= -1) then
@@ -2303,7 +2548,7 @@ contains
     use dimensions_mod, only : max_corner_elem
     use control_mod, only : north, south, east, west, neast, nwest, seast, swest
     use edgetype_mod, only : Ghostbuffer3d_t
-    implicit none 
+    implicit none
     type (Ghostbuffer3D_t),         intent(in)  :: edge
 
     integer,               intent(in)  :: vlyr
@@ -2325,10 +2570,10 @@ contains
 
     threadsafe=.false.
 
-    is=desc%getmapP_ghost(south) 
-    ie=desc%getmapP_ghost(east)  
-    in=desc%getmapP_ghost(north) 
-    iw=desc%getmapP_ghost(west)  
+    is=desc%getmapP_ghost(south)
+    ie=desc%getmapP_ghost(east)
+    in=desc%getmapP_ghost(north)
+    iw=desc%getmapP_ghost(west)
 
     ! example for north buffer
     ! first row ('edge') goes in v(:,np+1,k)
@@ -2349,7 +2594,7 @@ contains
     do l=swest,swest+max_corner_elem-1
        ic = desc%getmapP_ghost(l)
        if (ic /= -1 .and. l.eq.swest) then   ! unpack swest corner, IGNORE all other corners
-       !if(ic /= -1) then 
+       !if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
              do k=1,vlyr
@@ -2372,12 +2617,12 @@ contains
           endif
        endif
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
        if (ic /= -1 .and. l.eq.seast) then   ! unpack seast corner, IGNORE all other corners
-       !if(ic /= -1) then 
+       !if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
              do k=1,vlyr
@@ -2405,7 +2650,7 @@ contains
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
        if (ic /= -1 .and. l.eq.neast) then   ! unpack neast corner, IGNORE all other corners
-       !if(ic /= -1) then 
+       !if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
              do k=1,vlyr
@@ -2468,20 +2713,20 @@ contains
   !
   !> @brief Pack edges of v into an edge buffer for boundary exchange.
   !
-  !> This subroutine packs for one or more vertical layers into an edge 
-  !! buffer. If the buffer associated with edge is not large enough to 
-  !! hold all vertical layers you intent to pack, the method will 
+  !> This subroutine packs for one or more vertical layers into an edge
+  !! buffer. If the buffer associated with edge is not large enough to
+  !! hold all vertical layers you intent to pack, the method will
   !! halt the program with a call to parallel_mod::haltmp().
   !! @param[in] edge Ghost Buffer into which the data will be packed.
   !! This buffer must be previously allocated with initghostbuffer().
   !! @param[in] v The data to be packed.
   !! @param[in] vlyr Number of vertical level coming into the subroutine
   !! for packing for input v.
-  !! @param[in] kptr Vertical pointer to the place in the edge buffer where 
+  !! @param[in] kptr Vertical pointer to the place in the edge buffer where
   !! data will be located.
   ! =========================================
   subroutine GhostVpack_unoriented(edge,v,nc,vlyr,kptr,desc)
-    use edgetype_mod, only : edgedescriptor_t, ghostbuffer3d_t 
+    use edgetype_mod, only : edgedescriptor_t, ghostbuffer3d_t
     implicit none
     type (Ghostbuffer3D_t),intent(inout) :: edge
     integer,              intent(in)   :: vlyr
@@ -2501,7 +2746,7 @@ contains
        l=desc%loc2buf(l_local)
        is = desc%putmapP_ghost(l)
        do k=1,vlyr
-          edge%buf(:,:,kptr+k,is) = v(:,:,k)  
+          edge%buf(:,:,kptr+k,is) = v(:,:,k)
        enddo
     end do
 
@@ -2543,7 +2788,7 @@ contains
           l = desc%loc2buf(m)
           is = desc%getmapP_ghost(l)
           do k=1,vlyr
-             v(:,:,k,n) = edge%buf(:,:,kptr+k,is) 
+             v(:,:,k,n) = edge%buf(:,:,kptr+k,is)
           enddo
        end if
     end do
@@ -2613,7 +2858,7 @@ contains
 ! =========================================
 
 subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
-  
+
   use dimensions_mod, only : max_corner_elem
   use control_mod, only : north, south, east, west, neast, nwest, seast, swest
   use edgetype_mod, only : EdgeDescriptor_t, Ghostbuffertr_t
@@ -2624,7 +2869,7 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   integer,              intent(in)   :: vlyr
   integer,              intent(in)   :: ntrac
   integer,              intent(in)   :: npoints,nhc, kptr
-  
+
   real (kind=real_kind),intent(in)   :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac)
   type (EdgeDescriptor_t),intent(in) :: desc
 
@@ -2638,11 +2883,11 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
      threadsafe=.true.
   end if
   ! Example convenction for buffer to the north:
-  !  buf(:,,:,i,e) 
-  !   each "edge" is a row of data (i=1,np) in the element 
+  !  buf(:,,:,i,e)
+  !   each "edge" is a row of data (i=1,np) in the element
   !     north most row of data goes into e=1
   !     next row of data goes into e=2
-  !     .... 
+  !     ....
   !     south most row of data goes into e=np
   !   We need to pack this way to preserve the orientation
   !   so the data can be unpacked correctly
@@ -2650,10 +2895,10 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   ! note: we think of buf as dimensioned buf(k,is,i,e)
   ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
   !
-  is = desc%putmapP_ghost(south) 
-  ie = desc%putmapP_ghost(east)  
-  in = desc%putmapP_ghost(north) 
-  iw = desc%putmapP_ghost(west)  
+  is = desc%putmapP_ghost(south)
+  ie = desc%putmapP_ghost(east)
+  in = desc%putmapP_ghost(north)
+  iw = desc%putmapP_ghost(west)
 
 !    print *,nc,is,ie,in,iw
   do itr=1,ntrac
@@ -2749,7 +2994,7 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
       enddo
      end if
   end do
-  
+
 ! SEAST
   do l=swest+max_corner_elem,swest+2*max_corner_elem-1
      if (l.ne.seast) call abortmp('ERROR2: seast ghost cell update requires ne>0 cubed-sphere mesh')
@@ -2766,7 +3011,7 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
       enddo
      end if
   end do
-  
+
 ! NEAST
   do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
      if (l.ne.neast) call abortmp('ERROR2: neast ghost cell update requires ne>0 cubed-sphere mesh')
@@ -2783,7 +3028,7 @@ subroutine ghostVpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
         enddo
       end if
   end do
-  
+
 ! NWEST
   do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
      if (l.ne.nwest) call abortmp('ERROR2: nwest ghost cell update requires ne>0 cubed-sphere mesh')
@@ -2813,12 +3058,12 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   use dimensions_mod, only : max_corner_elem!, ntrac_d
   use control_mod, only : north, south, east, west, neast, nwest, seast, swest
   use edgetype_mod, only : Ghostbuffertr_t
-  implicit none 
+  implicit none
   type (Ghostbuffertr_t)                      :: edge
   integer,              intent(in)   :: vlyr
   integer,              intent(in)   :: ntrac
   integer,              intent(in)   :: npoints,nhc,kptr
-  
+
 !  real (kind=real_kind),intent(in)   :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac_d)
   real (kind=real_kind),intent(in)   :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac)!phl
   type (EdgeDescriptor_t),intent(in) :: desc
@@ -2833,11 +3078,11 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
      threadsafe=.true.
   end if
   ! Example convenction for buffer to the north:
-  !  buf(:,,:,i,e) 
-  !   each "edge" is a row of data (i=1,np) in the element 
+  !  buf(:,,:,i,e)
+  !   each "edge" is a row of data (i=1,np) in the element
   !     north most row of data goes into e=1
   !     next row of data goes into e=2
-  !     .... 
+  !     ....
   !     south most row of data goes into e=np
   !   We need to pack this way to preserve the orientation
   !   so the data can be unpacked correctly
@@ -2845,10 +3090,10 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   ! note: we think of buf as dimensioned buf(k,is,i,e)
   ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
   !
-  is = desc%putmapP_ghost(south) 
-  ie = desc%putmapP_ghost(east)  
-  in = desc%putmapP_ghost(north) 
-  iw = desc%putmapP_ghost(west)  
+  is = desc%putmapP_ghost(south)
+  ie = desc%putmapP_ghost(east)
+  in = desc%putmapP_ghost(north)
+  iw = desc%putmapP_ghost(west)
 
 !    print *,nc,is,ie,in,iw
   do itr=1,ntrac
@@ -2944,7 +3189,7 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
       enddo
      end if
   end do
-  
+
 ! SEAST
   do l=swest+max_corner_elem,swest+2*max_corner_elem-1
      if (l.ne.seast) call abortmp('ERROR2: seast ghost cell update requires ne>0 cubed-sphere mesh')
@@ -2961,7 +3206,7 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
       enddo
      end if
   end do
-  
+
 ! NEAST
   do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
      if (l.ne.neast) call abortmp('ERROR2: neast ghost cell update requires ne>0 cubed-sphere mesh')
@@ -2978,7 +3223,7 @@ subroutine ghostVpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
         enddo
       end if
   end do
-  
+
 ! NWEST
   do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
      if (l.ne.nwest) call abortmp('ERROR2: nwest ghost cell update requires ne>0 cubed-sphere mesh')
@@ -3009,9 +3254,9 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   integer,               intent(in)  :: vlyr
   integer,              intent(in)   :: ntrac
   integer,               intent(in)  :: kptr,nhc,npoints
-  
+
   real (kind=real_kind), intent(inout) :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac)
-  
+
   type (EdgeDescriptor_t)            :: desc
 
   ! Local
@@ -3019,13 +3264,13 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   integer :: i,j,k,l,itr
   integer :: is,ie,in,iw,ic
   logical :: reverse
-  
+
   threadsafe=.false.
 
-  is=desc%getmapP_ghost(south) 
-  ie=desc%getmapP_ghost(east)  
-  in=desc%getmapP_ghost(north) 
-  iw=desc%getmapP_ghost(west)  
+  is=desc%getmapP_ghost(south)
+  ie=desc%getmapP_ghost(east)
+  in=desc%getmapP_ghost(north)
+  iw=desc%getmapP_ghost(west)
 
   ! example for north buffer
   ! first row ('edge') goes in v(:,np+1,k)
@@ -3047,7 +3292,7 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
 ! SWEST
   do l=swest,swest+max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3081,14 +3326,14 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
              enddo
            enddo
          enddo
-       end do    
+       end do
      endif
   end do
-  
+
 ! SEAST
   do l=swest+max_corner_elem,swest+2*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3122,14 +3367,14 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
             enddo
           enddo
          enddo
-        end do  
+        end do
      endif
   end do
 
 ! NEAST
   do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3156,21 +3401,21 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
         endif
       else
         do itr=1,ntrac
-         do k=1,vlyr        
+         do k=1,vlyr
           do j=1,nhc
             do i=1,nhc
               v(npoints+i,npoints+j,k,itr)=edgeDefaultVal
             enddo
           enddo
          enddo
-        end do    
+        end do
      endif
   end do
 
 ! NWEST
   do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3204,7 +3449,7 @@ subroutine ghostVunpack(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
             enddo
           enddo
          enddo
-        end do    
+        end do
      endif
   end do
 
@@ -3226,10 +3471,10 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   integer,               intent(in)  :: vlyr
   integer,              intent(in)   :: ntrac
   integer,               intent(in)  :: kptr,nhc,npoints
-  
+
 !  real (kind=real_kind), intent(inout) :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac_d)
   real (kind=real_kind), intent(inout) :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc,vlyr,ntrac)!phl
-  
+
   type (EdgeDescriptor_t)            :: desc
 
   ! Local
@@ -3237,13 +3482,13 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
   integer :: i,j,k,l,itr
   integer :: is,ie,in,iw,ic
   logical :: reverse
-  
+
   threadsafe=.false.
 
-  is=desc%getmapP_ghost(south) 
-  ie=desc%getmapP_ghost(east)  
-  in=desc%getmapP_ghost(north) 
-  iw=desc%getmapP_ghost(west)  
+  is=desc%getmapP_ghost(south)
+  ie=desc%getmapP_ghost(east)
+  in=desc%getmapP_ghost(north)
+  iw=desc%getmapP_ghost(west)
 
   ! example for north buffer
   ! first row ('edge') goes in v(:,np+1,k)
@@ -3265,7 +3510,7 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
 ! SWEST
   do l=swest,swest+max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3299,14 +3544,14 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
              enddo
            enddo
          enddo
-       end do    
+       end do
      endif
   end do
-  
+
 ! SEAST
   do l=swest+max_corner_elem,swest+2*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3340,14 +3585,14 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
             enddo
           enddo
          enddo
-        end do  
+        end do
      endif
   end do
 
 ! NEAST
   do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3374,21 +3619,21 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
         endif
       else
         do itr=1,ntrac
-         do k=1,vlyr        
+         do k=1,vlyr
           do j=1,nhc
             do i=1,nhc
               v(npoints+i,npoints+j,k,itr)=edgeDefaultVal
             enddo
           enddo
          enddo
-        end do    
+        end do
      endif
   end do
 
 ! NWEST
   do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
      ic = desc%getmapP_ghost(l)
-     if(ic /= -1) then 
+     if(ic /= -1) then
         reverse=desc%reverse(l)
         if (reverse) then
           do itr=1,ntrac
@@ -3422,7 +3667,7 @@ subroutine ghostVunpackR(edge,v,nhc,npoints,vlyr,ntrac,kptr,desc)
             enddo
           enddo
          enddo
-        end do    
+        end do
      endif
   end do
 
@@ -3432,21 +3677,21 @@ end subroutine ghostVunpackR
 
   ! =================================================================================
   ! GHOSTVPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Pack edges of v into an ghost buffer for boundary exchange.
   !
   ! This subroutine packs for one vertical layers into an ghost
-  ! buffer. It is for cartesian points (v is only two dimensional). 
-  ! If the buffer associated with edge is not large enough to 
-  ! hold all vertical layers you intent to pack, the method will 
+  ! buffer. It is for cartesian points (v is only two dimensional).
+  ! If the buffer associated with edge is not large enough to
+  ! hold all vertical layers you intent to pack, the method will
   ! halt the program with a call to parallel_mod::haltmp().
-  ! INPUT: 
+  ! INPUT:
   ! - ghost Buffer into which the data will be packed.
   !   This buffer must be previously allocated with initGhostBuffer().
   ! - v The data to be packed.
   ! - nhc deep of ghost/halo zone
   ! - npoints number of points on on side
-  ! - kptr Vertical pointer to the place in the edge buffer where 
+  ! - kptr Vertical pointer to the place in the edge buffer where
   ! data will be located.
   ! =================================================================================
     subroutine ghostVpack2d(ghost,v,nhc, npoints,vlyr,ntrac,kptr,tn0,timelevels,desc)
@@ -3457,7 +3702,7 @@ end subroutine ghostVunpackR
       integer,               intent(in)  :: vlyr
       integer,              intent(in)   :: ntrac
       integer,              intent(in)      :: nhc,npoints,kptr, tn0, timelevels
-      
+
       real (kind=real_kind),intent(in)      :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc, vlyr, ntrac,timelevels)!phl
 !      real (kind=real_kind),intent(in)      :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc, vlyr, ntrac_d,timelevels)
       type (EdgeDescriptor_t),intent(in)    :: desc
@@ -3473,11 +3718,11 @@ end subroutine ghostVunpackR
          threadsafe=.true.
       end if
       ! Example convenction for buffer to the north:
-      !  buf(:,,:,i,e) 
-      !   each "edge" is a row of data (i=1,np) in the element 
+      !  buf(:,,:,i,e)
+      !   each "edge" is a row of data (i=1,np) in the element
       !     north most row of data goes into e=1
       !     next row of data goes into e=2
-      !     .... 
+      !     ....
       !     south most row of data goes into e=np
       !   We need to pack this way to preserve the orientation
       !   so the data can be unpacked correctly
@@ -3485,10 +3730,10 @@ end subroutine ghostVunpackR
       ! note: we think of buf as dimensioned buf(k,is,i,e)
       ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
       !
-      is = desc%putmapP_ghost(south) 
-      ie = desc%putmapP_ghost(east)  
-      in = desc%putmapP_ghost(north) 
-      iw = desc%putmapP_ghost(west)  
+      is = desc%putmapP_ghost(south)
+      ie = desc%putmapP_ghost(east)
+      in = desc%putmapP_ghost(north)
+      iw = desc%putmapP_ghost(west)
       do itr=1,ntrac
        do k=1,vlyr
           do i=1,npoints
@@ -3523,7 +3768,7 @@ end subroutine ghostVunpackR
       if(desc%reverse(east)) then
   !        ie = desc%putmapP_ghost(east)
         do itr=1,ntrac
-          do k=1,vlyr  
+          do k=1,vlyr
             do i=1,npoints
               do j=1,nhc
                 ir = npoints-i+1
@@ -3574,9 +3819,9 @@ end subroutine ghostVunpackR
                    do j=1,nhc
                      ghost%buf(i,j,kptr+k,itr,desc%putmapP_ghost(l))=v(i+1,j+1,k,itr,tn0 )
                    enddo
-                 enddo     
+                 enddo
                enddo
-             enddo        
+             enddo
            end if
       end do
 
@@ -3586,13 +3831,13 @@ end subroutine ghostVunpackR
            if (desc%putmapP_ghost(l) /= -1) then
              do itr=1,ntrac
                do k=1,vlyr
-                 do i=1,nhc             
+                 do i=1,nhc
                    do j=1,nhc
                      ghost%buf(i,j,kptr+k,itr,desc%putmapP_ghost(l))=v(npoints-i ,j+1,k,itr,tn0)
                    enddo
                  enddo
                enddo
-             enddo             
+             enddo
            end if
       end do
 
@@ -3604,7 +3849,7 @@ end subroutine ghostVunpackR
                do k=1,vlyr
                  do i=1,nhc
                    do j=1,nhc
-                     ghost%buf(i,j,kptr+k,itr,desc%putmapP_ghost(l))=v(npoints-i,npoints-j,k,itr,tn0)           
+                     ghost%buf(i,j,kptr+k,itr,desc%putmapP_ghost(l))=v(npoints-i,npoints-j,k,itr,tn0)
                    enddo
                  enddo
                enddo
@@ -3621,17 +3866,17 @@ end subroutine ghostVunpackR
                  do i=1,nhc
                    do j=1,nhc
                      ghost%buf(i,j,kptr+k,itr,desc%putmapP_ghost(l))=v(i+1,npoints-j,k,itr,tn0)
-                   enddo       
+                   enddo
                  enddo
                enddo
-             enddo      
+             enddo
            end if
-      end do   
+      end do
     end subroutine ghostVpack2d
 
   ! =================================================================================
   ! GHOSTVUNPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Unpack ghost points from ghost buffer into v...
   ! It is for cartesian points (v is only two dimensional).
   ! INPUT SAME arguments as for GHOSTVPACK2d
@@ -3654,13 +3899,13 @@ end subroutine ghostVunpackR
     integer :: i,j,l, itr, k
     integer :: is,ie,in,iw,ic
     logical :: reverse
-    
+
     threadsafe=.false.
 
-    is=desc%getmapP_ghost(south) 
-    ie=desc%getmapP_ghost(east)  
-    in=desc%getmapP_ghost(north) 
-    iw=desc%getmapP_ghost(west)  
+    is=desc%getmapP_ghost(south)
+    ie=desc%getmapP_ghost(east)
+    in=desc%getmapP_ghost(north)
+    iw=desc%getmapP_ghost(west)
 
     ! example for north buffer
     ! first row ('edge') goes in v(:,np+1)
@@ -3681,8 +3926,8 @@ end subroutine ghostVunpackR
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-       ic = desc%getmapP_ghost(l)       
-       if(ic /= -1) then 
+       ic = desc%getmapP_ghost(l)
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do itr=1,ntrac
@@ -3714,14 +3959,14 @@ end subroutine ghostVunpackR
                enddo
              enddo
            enddo
-         enddo      
+         enddo
        endif
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do itr=1,ntrac
@@ -3761,8 +4006,8 @@ end subroutine ghostVunpackR
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do itr=1,ntrac
@@ -3792,17 +4037,17 @@ end subroutine ghostVunpackR
                 do i=1,nhc
                   v(npoints+i ,npoints+j,k,itr,tn0)=edgeDefaultVal
                 enddo
-              enddo 
+              enddo
             enddo
-          enddo   
+          enddo
        endif
     end do
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do itr=1,ntrac
@@ -3844,21 +4089,21 @@ end subroutine ghostVunpackR
 
   ! =================================================================================
   ! GHOSTVPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Pack edges of v into an ghost buffer for boundary exchange.
   !
   ! This subroutine packs for one vertical layers into an ghost
-  ! buffer. It is for cartesian points (v is only two dimensional). 
-  ! If the buffer associated with edge is not large enough to 
-  ! hold all vertical layers you intent to pack, the method will 
+  ! buffer. It is for cartesian points (v is only two dimensional).
+  ! If the buffer associated with edge is not large enough to
+  ! hold all vertical layers you intent to pack, the method will
   ! halt the program with a call to parallel_mod::haltmp().
-  ! INPUT: 
+  ! INPUT:
   ! - ghost Buffer into which the data will be packed.
   !   This buffer must be previously allocated with initGhostBuffer().
   ! - v The data to be packed.
   ! - nhc deep of ghost/halo zone
   ! - npoints number of points on on side
-  ! - kptr Vertical pointer to the place in the edge buffer where 
+  ! - kptr Vertical pointer to the place in the edge buffer where
   ! data will be located.
   ! =================================================================================
     subroutine ghostVpack2d_level(ghost,v,kptr,nhc, npoints,vlyr,desc)
@@ -3868,7 +4113,7 @@ end subroutine ghostVunpackR
       type (Ghostbuffertr_t)                  :: ghost
       integer,               intent(in)     :: vlyr,kptr
       integer,              intent(in)      :: nhc,npoints
-      
+
       real (kind=real_kind),intent(in)      :: v(1-nhc:,1-nhc:,:)
       type (EdgeDescriptor_t),intent(in)    :: desc
 
@@ -3883,11 +4128,11 @@ end subroutine ghostVunpackR
          threadsafe=.true.
       end if
       ! Example convenction for buffer to the north:
-      !  buf(:,,:,i,e) 
-      !   each "edge" is a row of data (i=1,np) in the element 
+      !  buf(:,,:,i,e)
+      !   each "edge" is a row of data (i=1,np) in the element
       !     north most row of data goes into e=1
       !     next row of data goes into e=2
-      !     .... 
+      !     ....
       !     south most row of data goes into e=np
       !   We need to pack this way to preserve the orientation
       !   so the data can be unpacked correctly
@@ -3895,10 +4140,10 @@ end subroutine ghostVunpackR
       ! note: we think of buf as dimensioned buf(k,is,i,e)
       ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
       !
-      is = desc%putmapP_ghost(south) 
-      ie = desc%putmapP_ghost(east)  
-      in = desc%putmapP_ghost(north) 
-      iw = desc%putmapP_ghost(west)  
+      is = desc%putmapP_ghost(south)
+      ie = desc%putmapP_ghost(east)
+      in = desc%putmapP_ghost(north)
+      iw = desc%putmapP_ghost(west)
        do k=1,vlyr
           do i=1,npoints
              do j=1,nhc
@@ -3928,7 +4173,7 @@ end subroutine ghostVunpackR
 
       if(desc%reverse(east)) then
   !        ie = desc%putmapP_ghost(east)
-          do k=1,vlyr  
+          do k=1,vlyr
             do i=1,npoints
               do j=1,nhc
                 ir = npoints-i+1
@@ -3973,7 +4218,7 @@ end subroutine ghostVunpackR
                    do j=1,nhc
                      ghost%buf(i,j,k,kptr,desc%putmapP_ghost(l))=v(i+1,j+1,k)
                    enddo
-                 enddo     
+                 enddo
                enddo
            end if
       end do
@@ -3983,7 +4228,7 @@ end subroutine ghostVunpackR
          if (l.ne.seast) call abortmp('ERROR3: seast ghost cell update requires ne>0 cubed-sphere mesh')
            if (desc%putmapP_ghost(l) /= -1) then
                do k=1,vlyr
-                 do i=1,nhc             
+                 do i=1,nhc
                    do j=1,nhc
                      ghost%buf(i,j,k,kptr,desc%putmapP_ghost(l))=v(npoints-i ,j+1,k)
                    enddo
@@ -3999,7 +4244,7 @@ end subroutine ghostVunpackR
                do k=1,vlyr
                  do i=1,nhc
                    do j=1,nhc
-                     ghost%buf(i,j,k,kptr,desc%putmapP_ghost(l))=v(npoints-i,npoints-j,k)           
+                     ghost%buf(i,j,k,kptr,desc%putmapP_ghost(l))=v(npoints-i,npoints-j,k)
                    enddo
                  enddo
                enddo
@@ -4014,16 +4259,16 @@ end subroutine ghostVunpackR
                  do i=1,nhc
                    do j=1,nhc
                      ghost%buf(i,j,k,kptr,desc%putmapP_ghost(l))=v(i+1,npoints-j,k)
-                   enddo       
+                   enddo
                  enddo
                enddo
            end if
-      end do   
+      end do
     end subroutine ghostVpack2d_level
 
   ! =================================================================================
   ! GHOSTVUNPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Unpack ghost points from ghost buffer into v...
   ! It is for cartesian points (v is only two dimensional).
   ! INPUT SAME arguments as for GHOSTVPACK2d
@@ -4045,13 +4290,13 @@ end subroutine ghostVunpackR
     integer :: i,j,l, itr, k
     integer :: is,ie,in,iw,ic
     logical :: reverse
-    
+
     threadsafe=.false.
 
-    is=desc%getmapP_ghost(south) 
-    ie=desc%getmapP_ghost(east)  
-    in=desc%getmapP_ghost(north) 
-    iw=desc%getmapP_ghost(west)  
+    is=desc%getmapP_ghost(south)
+    ie=desc%getmapP_ghost(east)
+    in=desc%getmapP_ghost(north)
+    iw=desc%getmapP_ghost(west)
 
     ! example for north buffer
     ! first row ('edge') goes in v(:,np+1)
@@ -4070,8 +4315,8 @@ end subroutine ghostVunpackR
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-       ic = desc%getmapP_ghost(l)       
-       if(ic /= -1) then 
+       ic = desc%getmapP_ghost(l)
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
               do k=1,vlyr
@@ -4100,11 +4345,11 @@ end subroutine ghostVunpackR
            enddo
        endif
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
               do k=1,vlyr
@@ -4138,8 +4383,8 @@ end subroutine ghostVunpackR
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
               do k=1,vlyr
@@ -4164,7 +4409,7 @@ end subroutine ghostVunpackR
                 do i=1,nhc
                   v(npoints+i ,npoints+j,k)=edgeDefaultVal
                 enddo
-              enddo 
+              enddo
             enddo
        endif
     end do
@@ -4172,8 +4417,8 @@ end subroutine ghostVunpackR
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
               do k=1,vlyr
@@ -4209,21 +4454,21 @@ end subroutine ghostVunpackR
 
   ! =================================================================================
   ! GHOSTVPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Pack edges of v into an ghost buffer for boundary exchange.
   !
   ! This subroutine packs for one vertical layers into an ghost
-  ! buffer. It is for cartesian points (v is only two dimensional). 
-  ! If the buffer associated with edge is not large enough to 
-  ! hold all vertical layers you intent to pack, the method will 
+  ! buffer. It is for cartesian points (v is only two dimensional).
+  ! If the buffer associated with edge is not large enough to
+  ! hold all vertical layers you intent to pack, the method will
   ! halt the program with a call to parallel_mod::haltmp().
-  ! INPUT: 
+  ! INPUT:
   ! - ghost Buffer into which the data will be packed.
   !   This buffer must be previously allocated with initGhostBuffer().
   ! - v The data to be packed.
   ! - nhc deep of ghost/halo zone
   ! - npoints number of points on on side
-  ! - kptr Vertical pointer to the place in the edge buffer where 
+  ! - kptr Vertical pointer to the place in the edge buffer where
   ! data will be located.
   ! =================================================================================
     subroutine ghostVpack2d_single(ghost,v,nhc, npoints,desc)
@@ -4232,7 +4477,7 @@ end subroutine ghostVunpackR
 
       type (Ghostbuffertr_t)                  :: ghost
       integer,              intent(in)      :: nhc,npoints
-      
+
       real (kind=real_kind),intent(in)      :: v(1-nhc:npoints+nhc,1-nhc:npoints+nhc)
       type (EdgeDescriptor_t),intent(in)    :: desc
 
@@ -4247,11 +4492,11 @@ end subroutine ghostVunpackR
          threadsafe=.true.
       end if
       ! Example convenction for buffer to the north:
-      !  buf(:,,:,i,e) 
-      !   each "edge" is a row of data (i=1,np) in the element 
+      !  buf(:,,:,i,e)
+      !   each "edge" is a row of data (i=1,np) in the element
       !     north most row of data goes into e=1
       !     next row of data goes into e=2
-      !     .... 
+      !     ....
       !     south most row of data goes into e=np
       !   We need to pack this way to preserve the orientation
       !   so the data can be unpacked correctly
@@ -4259,10 +4504,10 @@ end subroutine ghostVunpackR
       ! note: we think of buf as dimensioned buf(k,is,i,e)
       ! but this array is flatted to:   buf(k,is+(i-1)+(e-1)*np)
       !
-      is = desc%putmapP_ghost(south) 
-      ie = desc%putmapP_ghost(east)  
-      in = desc%putmapP_ghost(north) 
-      iw = desc%putmapP_ghost(west)  
+      is = desc%putmapP_ghost(south)
+      ie = desc%putmapP_ghost(east)
+      in = desc%putmapP_ghost(north)
+      iw = desc%putmapP_ghost(west)
 
       do i=1,npoints
          do j=1,nhc
@@ -4288,7 +4533,7 @@ end subroutine ghostVunpackR
       endif
 
       if(desc%reverse(east)) then
-  !        ie = desc%putmapP_ghost(east) 
+  !        ie = desc%putmapP_ghost(east)
         do i=1,npoints
           do j=1,nhc
             ir = npoints-i+1
@@ -4327,7 +4572,7 @@ end subroutine ghostVunpackR
                do j=1,nhc
                  ghost%buf(i,j,1,1,desc%putmapP_ghost(l))=v(i+1,j+1)
                enddo
-             enddo           
+             enddo
            end if
       end do
 
@@ -4335,11 +4580,11 @@ end subroutine ghostVunpackR
       do l=swest+max_corner_elem,swest+2*max_corner_elem-1
          if (l.ne.seast) call abortmp('ERROR3: seast ghost cell update requires ne>0 cubed-sphere mesh')
            if (desc%putmapP_ghost(l) /= -1) then
-             do i=1,nhc             
+             do i=1,nhc
                do j=1,nhc
                  ghost%buf(i,j,1,1,desc%putmapP_ghost(l))=v(npoints-i ,j+1)
                enddo
-             enddo         
+             enddo
            end if
       end do
 
@@ -4349,7 +4594,7 @@ end subroutine ghostVunpackR
            if (desc%putmapP_ghost(l) /= -1) then
              do i=1,nhc
                do j=1,nhc
-                 ghost%buf(i,j,1,1,desc%putmapP_ghost(l))=v(npoints-i,npoints-j)           
+                 ghost%buf(i,j,1,1,desc%putmapP_ghost(l))=v(npoints-i,npoints-j)
                enddo
              enddo
             end if
@@ -4362,15 +4607,15 @@ end subroutine ghostVunpackR
              do i=1,nhc
                do j=1,nhc
                  ghost%buf(i,j,1,1,desc%putmapP_ghost(l))=v(i+1,npoints-j)
-               enddo       
-             enddo     
+               enddo
+             enddo
            end if
-      end do   
+      end do
     end subroutine ghostVpack2d_single
 
   ! =================================================================================
   ! GHOSTVUNPACK2D
-  ! AUTHOR: Christoph Erath 
+  ! AUTHOR: Christoph Erath
   ! Unpack ghost points from ghost buffer into v...
   ! It is for cartesian points (v is only two dimensional).
   ! INPUT SAME arguments as for GHOSTVPACK2d
@@ -4392,13 +4637,13 @@ end subroutine ghostVunpackR
     integer :: i,j,l, itr, k
     integer :: is,ie,in,iw,ic
     logical :: reverse
-    
+
     threadsafe=.false.
 
-    is=desc%getmapP_ghost(south) 
-    ie=desc%getmapP_ghost(east)  
-    in=desc%getmapP_ghost(north) 
-    iw=desc%getmapP_ghost(west)  
+    is=desc%getmapP_ghost(south)
+    ie=desc%getmapP_ghost(east)
+    in=desc%getmapP_ghost(north)
+    iw=desc%getmapP_ghost(west)
 
     ! example for north buffer
     ! first row ('edge') goes in v(:,np+1)
@@ -4415,8 +4660,8 @@ end subroutine ghostVunpackR
 
 ! SWEST
     do l=swest,swest+max_corner_elem-1
-       ic = desc%getmapP_ghost(l)       
-       if(ic /= -1) then 
+       ic = desc%getmapP_ghost(l)
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do j=1,nhc
@@ -4436,14 +4681,14 @@ end subroutine ghostVunpackR
            do i=1,nhc
              v(1-i,1-j)=edgeDefaultVal
            enddo
-         enddo     
+         enddo
        endif
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do j=1,nhc
@@ -4471,8 +4716,8 @@ end subroutine ghostVunpackR
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do j=1,nhc
@@ -4492,15 +4737,15 @@ end subroutine ghostVunpackR
             do i=1,nhc
               v(npoints+i ,npoints+j)=edgeDefaultVal
             enddo
-          enddo  
+          enddo
        endif
     end do
 
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       
-       if(ic /= -1) then 
+
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (reverse) then
             do j=1,nhc
@@ -4572,8 +4817,8 @@ end subroutine ghostVunpackR
     ghost%buf=0
     ghost%receive=0
 
-    
-    
+
+
 
   end subroutine initGhostBuffer3d
 
@@ -4585,17 +4830,17 @@ end subroutine ghostVunpackR
   ! Pack edges of v into an ghost buffer for boundary exchange.
   !
   ! This subroutine packs for many vertical layers into an ghost
-  ! buffer. 
-  ! If the buffer associated with edge is not large enough to 
-  ! hold all vertical layers you intent to pack, the method will 
+  ! buffer.
+  ! If the buffer associated with edge is not large enough to
+  ! hold all vertical layers you intent to pack, the method will
   ! halt the program with a call to parallel_mod::haltmp().
-  ! INPUT: 
+  ! INPUT:
   ! - ghost Buffer into which the data will be packed.
   !   This buffer must be previously allocated with initGhostBuffer().
   ! - v The data to be packed.
   ! - nhc deep of ghost/halo zone
   ! - npoints number of points on on side
-  ! - kptr Vertical pointer to the place in the edge buffer where 
+  ! - kptr Vertical pointer to the place in the edge buffer where
   ! data will be located.
   ! =================================================================================
   subroutine ghostVpack3d(ghost, v, vlyr, kptr, desc)
@@ -4608,7 +4853,7 @@ end subroutine ghostVunpackR
     integer,              intent(in)      :: kptr,vlyr
     real (kind=real_kind),intent(in)      :: v(ghost%np, ghost%np, vlyr)
     type (EdgeDescriptor_t),intent(in)    :: desc
-    
+
     integer                               :: nhc, np
 
     ! Local variables
@@ -4621,11 +4866,11 @@ end subroutine ghostVunpackR
        threadsafe=.true.
     end if
     ! Example convenction for buffer to the north:
-    !  buf(:,,:,i,e) 
-    !   each "edge" is a row of data (i=1,np) in the element 
+    !  buf(:,,:,i,e)
+    !   each "edge" is a row of data (i=1,np) in the element
     !     north most row of data goes into e=1
     !     next row of data goes into e=2
-    !     .... 
+    !     ....
     !     south most row of data goes into e=np
     !   We need to pack this way to preserve the orientation
     !   so the data can be unpacked correctly
@@ -4635,10 +4880,10 @@ end subroutine ghostVunpackR
     !
     nhc = ghost%nhc
     np = ghost%np
-    is = desc%putmapP_ghost(south) 
-    ie = desc%putmapP_ghost(east)  
-    in = desc%putmapP_ghost(north) 
-    iw = desc%putmapP_ghost(west)  
+    is = desc%putmapP_ghost(south)
+    ie = desc%putmapP_ghost(east)
+    in = desc%putmapP_ghost(north)
+    iw = desc%putmapP_ghost(west)
 
     do k=1,vlyr
        do j=1,nhc
@@ -4708,7 +4953,7 @@ end subroutine ghostVunpackR
                 do i=1,nhc+1
                    ghost%buf(i, j, kptr+k, desc%putmapP_ghost(l))=v(i, j, k)
                 enddo
-             enddo   
+             enddo
           enddo
        end if
     end do
@@ -4718,27 +4963,27 @@ end subroutine ghostVunpackR
        if (desc%putmapP_ghost(l) /= -1) then
           do k=1,vlyr
              do j=1,nhc+1
-                do i=1,nhc+1           
+                do i=1,nhc+1
                    ghost%buf(i, j, kptr+k, desc%putmapP_ghost(l))=v(np-i+1, j, k)
                 enddo
              enddo
           enddo
        end if
     end do
-    
+
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        if (desc%putmapP_ghost(l) /= -1) then
           do k=1,vlyr
              do j=1,nhc+1
                 do i=1,nhc+1
-                   ghost%buf(i, j, kptr+k,desc%putmapP_ghost(l))=v(np-i+1, np-j+1, k)           
+                   ghost%buf(i, j, kptr+k,desc%putmapP_ghost(l))=v(np-i+1, np-j+1, k)
                 enddo
              enddo
           enddo
        end if
     end do
-    
+
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        if (desc%putmapP_ghost(l) /= -1) then
@@ -4752,7 +4997,7 @@ end subroutine ghostVunpackR
        end if
     end do
   end subroutine ghostVpack3d
-    
+
   ! =================================================================================
   ! GHOSTVUNPACK3D
   ! AUTHOR: James Overfelt (from a subroutine of Christoph Erath, ghostVunpack2d)
@@ -4784,16 +5029,16 @@ end subroutine ghostVunpackR
     integer :: i,j,k,l
     integer :: is,ie,in,iw,ic
     logical :: reverse
-    
+
     threadsafe=.false.
 
     nhc     = g%nhc
     np      = g%np
 
-    is=desc%getmapP_ghost(south) 
-    ie=desc%getmapP_ghost(east)  
-    in=desc%getmapP_ghost(north) 
-    iw=desc%getmapP_ghost(west)  
+    is=desc%getmapP_ghost(south)
+    ie=desc%getmapP_ghost(east)
+    in=desc%getmapP_ghost(north)
+    iw=desc%getmapP_ghost(west)
 
 ! fill in optional values with edgeDefaultVal
     do k=1,vlyr
@@ -4811,7 +5056,7 @@ end subroutine ghostVunpackR
     ! first row ('edge') goes in v(:,np+1)
     ! 2nd   row ('edge') goes in v(:,np+2)
     ! etc...
-    
+
     do k=1,vlyr
        do j=1,nhc
           do i=1,np
@@ -4832,8 +5077,8 @@ end subroutine ghostVunpackR
 
 ! SWEST
     do l=swest, swest+max_corner_elem-1
-       ic = desc%getmapP_ghost(l)       
-       if(ic /= -1) then 
+       ic = desc%getmapP_ghost(l)
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (mult(swest) .eq. 0) then
             if (reverse) then
@@ -4875,11 +5120,11 @@ end subroutine ghostVunpackR
           mult(swest) = mult(swest) + 1
        endif
     end do
-    
+
 ! SEAST
     do l=swest+max_corner_elem,swest+2*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (mult(seast) .eq. 0) then
             if (reverse) then
@@ -4926,7 +5171,7 @@ end subroutine ghostVunpackR
 ! NEAST
     do l=swest+3*max_corner_elem,swest+4*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (mult(neast) .eq. 0) then
             if (reverse) then
@@ -4972,7 +5217,7 @@ end subroutine ghostVunpackR
 ! NWEST
     do l=swest+2*max_corner_elem,swest+3*max_corner_elem-1
        ic = desc%getmapP_ghost(l)
-       if(ic /= -1) then 
+       if(ic /= -1) then
           reverse=desc%reverse(l)
           if (mult(nwest) .eq. 0) then
              if (reverse) then
@@ -5014,7 +5259,7 @@ end subroutine ghostVunpackR
           mult(nwest) = mult(nwest) + 1
        endif
     end do
-    
+
   end subroutine ghostVunpack3d
 
 
@@ -5024,16 +5269,16 @@ End module edge_mod
 #ifndef HAVE_F2003_PTR_BND_REMAP
 !
 ! subroutine to allow sharing edge buffers
-! this has to be outside a module to allow us to (F77 style) access the same chunk 
+! this has to be outside a module to allow us to (F77 style) access the same chunk
 ! of memory with a different shape
 !
 ! some compilers dont allow the 'target' attribute to be used in a F77 subroutine
 ! such as cray.  if that is the case, try compiling with -DHAVE_F2003_PTR_BND_REMAP
 !
 subroutine remap_1D_ptr_buf(edge,nbuf,src_array)
-use edgetype_mod, only       : EdgeBuffer_t ! _EXTERNAL                                                   
+use edgetype_mod, only       : EdgeBuffer_t ! _EXTERNAL
 use kinds, only          : real_kind
-! input                                                                                               
+! input
 type (EdgeBuffer_t) :: edge
 integer :: nbuf
 real(kind=real_kind) , target :: src_array(nbuf)
@@ -5043,10 +5288,10 @@ edge%buf  => src_array
 end subroutine remap_1D_ptr_buf
 
 subroutine remap_1D_ptr_receive(edge,nbuf,src_array)
-use edgetype_mod, only       : EdgeBuffer_t ! _EXTERNAL                                                   
+use edgetype_mod, only       : EdgeBuffer_t ! _EXTERNAL
 use kinds, only          : real_kind
-implicit none 
-! input                                                                                               
+implicit none
+! input
 type (EdgeBuffer_t) :: edge
 integer :: nbuf
 real(kind=real_kind) , target :: src_array(nbuf)

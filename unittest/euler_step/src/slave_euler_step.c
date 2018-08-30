@@ -158,7 +158,7 @@ void slave_euler_step_(param_t *param_s) {
       }
     }
   }
-#if 1
+#if 0
   if (id == 0) {
     printf("slice_qdp:%d\n", slice_qdp);
   }

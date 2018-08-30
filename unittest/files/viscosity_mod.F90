@@ -341,6 +341,7 @@ subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
 use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
 use physical_constants, only : rrearth
 use control_mod, only : hypervis_scaling, hypervis_power
+use control_mod, only : north, south, east, west, neast, nwest, seast, swest
 type (hybrid_t)      , intent(in) :: hybrid
 type (element_t)     , intent(inout), target :: elem(:)
 integer :: nets,nete
@@ -366,18 +367,27 @@ logical :: var_coef
   real(kind=real_kind) ::  v1(np,np),v2(np,np)
 
   real(kind=real_kind) ::  vtemp(np,np,2)
+  integer :: reverse(4, nets:nete)
 
   integer :: step_elem
   external :: slave_biharmonic_wk_scalar
   external :: slave_biharmonic_wk_scalar_2
   type param_t
     integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
-        , Dvv
+        , Dvv, buf
+    integer*8 :: putmap, reverse
     real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
     integer :: nets, nete, qsize, step_elem
   end type param_t
   type(param_t) :: param_s
-  type(param_t) :: param_lap2
+  type param_2_t
+    integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
+        , Dvv, receive
+    integer*8 :: getmap
+    real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
+    integer :: nets, nete, qsize, step_elem
+  end type param_2_t
+  type(param_2_t) :: param_s2
 
    var_coef1 = .true.
    if(hypervis_scaling > 0)    var_coef1 = .false.
@@ -385,6 +395,29 @@ logical :: var_coef
 #define SW_LAP
 #ifdef SW_LAP
 call t_startf('sw_biharmonic_1')
+do ie = nets, nete
+  if (edgeq%reverse(west, ie)) then
+    reverse(1, ie) = 1
+  else
+    reverse(1, ie) = 0
+  endif
+  if (edgeq%reverse(east, ie)) then
+    reverse(2, ie) = 1
+  else
+    reverse(2, ie) = 0
+  endif
+  if (edgeq%reverse(south, ie)) then
+    reverse(3, ie) = 1
+  else
+    reverse(3, ie) = 0
+  endif
+  if (edgeq%reverse(north, ie)) then
+    reverse(4, ie) = 1
+  else
+    reverse(4, ie) = 0
+  endif
+enddo
+
 param_s%Dinv = loc(elem(nets)%Dinv)
 param_s%rspheremp = loc(elem(nets)%rspheremp)
 param_s%spheremp = loc(elem(nets)%spheremp)
@@ -392,6 +425,9 @@ param_s%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
 param_s%tensorVisc = loc(elem(nets)%tensorVisc)
 param_s%Qtens = loc(Qtens)
 param_s%Dvv = loc(deriv%Dvv)
+param_s%buf = loc(edgeq%buf)
+param_s%putmap = loc(edgeq%putmap(1,nets))
+param_s%reverse = loc(reverse)
 param_s%rrearth = rrearth
 param_s%hypervis_scaling = hypervis_scaling
 param_s%hypervis_power = hypervis_power
@@ -487,59 +523,64 @@ call t_stopf('sw_biharmonic_1')
          enddo
       enddo
     enddo
-#endif
-   call t_stopf('local_biharmonic_1')
     do ie = nets, nete
       do q = 1, qsize
          kptr = nlev*(q-1)
          call edgeVpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
       enddo
    enddo
+   call t_stopf('local_biharmonic_1')
+#endif
 
+   call t_startf('bndry_exchangeV')
    call bndry_exchangeV(hybrid,edgeq)
+   call t_stopf('bndry_exchangeV')
 
-   do ie=nets,nete
-      ! apply inverse mass matrix, then apply laplace again
-      do q=1,qsize
-        kptr = nlev*(q-1)
-        call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
-      enddo
-    enddo
 #ifdef  SW_LAP
 
-call t_startf('sw_biharmonic_2')
-param_lap2%Dinv = loc(elem(nets)%Dinv)
-param_lap2%rspheremp = loc(elem(nets)%rspheremp)
-param_lap2%spheremp = loc(elem(nets)%spheremp)
-param_lap2%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
-param_lap2%tensorVisc = loc(elem(nets)%tensorVisc)
-param_lap2%Qtens = loc(Qtens)
-param_lap2%Dvv = loc(deriv%Dvv)
-param_lap2%rrearth = rrearth
-param_lap2%hypervis_scaling = hypervis_scaling
-param_lap2%hypervis_power = hypervis_power
-param_lap2%nets = nets
-param_lap2%nete = nete
-param_lap2%qsize = qsize
-param_lap2%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
-call athread_spawn(slave_biharmonic_wk_scalar_2, param_lap2)
-call athread_join()
-call t_stopf('sw_biharmonic_2')
+  call t_startf('sw_biharmonic_2')
+  param_s2%Dinv = loc(elem(nets)%Dinv)
+  param_s2%rspheremp = loc(elem(nets)%rspheremp)
+  param_s2%spheremp = loc(elem(nets)%spheremp)
+  param_s2%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
+  param_s2%tensorVisc = loc(elem(nets)%tensorVisc)
+  param_s2%Qtens = loc(Qtens)
+  param_s2%Dvv = loc(deriv%Dvv)
+  param_s2%receive = loc(edgeq%receive)
+  param_s2%getmap = loc(edgeq%getmap(1,nets))
+  param_s2%rrearth = rrearth
+  param_s2%hypervis_scaling = hypervis_scaling
+  param_s2%hypervis_power = hypervis_power
+  param_s2%nets = nets
+  param_s2%nete = nete
+  param_s2%qsize = qsize
+  param_s2%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
+  call athread_spawn(slave_biharmonic_wk_scalar_2, param_s2)
+  call athread_join()
+  call t_stopf('sw_biharmonic_2')
 
 #else
-    call t_startf('local_biharmonic_2')
-    do ie = nets, nete
-      do q = 1, qsize
-        do k=1,nlev    !  Potential loop inversion (AAM)
-           lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
-           ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
-           call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=.true.)
-        enddo
+  call t_startf('local_biharmonic_2')
+  do ie=nets,nete
+   ! apply inverse mass matrix, then apply laplace again
+    do q=1,qsize
+      kptr = nlev*(q-1)
+      call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
+    enddo
+  enddo
+  do ie = nets, nete
+    do q = 1, qsize
+      do k=1,nlev    !  Potential loop inversion (AAM)
+        lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
+        ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
+        call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=.true.)
       enddo
-   enddo
-   call t_startf('local_biharmonic_2')
+    enddo
+  enddo
+  call t_stopf('local_biharmonic_2')
 #endif
 #else
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! origin biharmonic_wk_scalar code !!!!!!!!!!!!!!!!!!!!!!!
 type (hybrid_t)      , intent(in) :: hybrid
 type (element_t)     , intent(inout), target :: elem(:)
 integer :: nets,nete
