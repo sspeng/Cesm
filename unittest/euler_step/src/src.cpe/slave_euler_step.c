@@ -26,7 +26,7 @@
 typedef struct {
   double *qdp_s, *qdp_leap, *dp, *divdp_proj, *Qtens_biharmonic, *qmax, *qmin;
   double dt;
-  int  nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize, qsize_d;
+  int  nets, nete, np1_qdp, n0_qdp, DSSopt, rhs_multiplier, qsize;
 } param_t;
 
 void slave_euler_step_(param_t *param_s) {
@@ -54,7 +54,6 @@ void slave_euler_step_(param_t *param_s) {
   int DSSopt = param_d.DSSopt;
   int rhs_multiplier = param_d.rhs_multiplier;
   int qsize = param_d.qsize;
-  int qsize_d = param_d.qsize_d;
 
   int istep_Qten = qsize*NLEV*NP*NP; // stripe in ie axis of Qtens_biharmonic array
   int istep_qmax = qsize*NLEV;
@@ -77,8 +76,8 @@ void slave_euler_step_(param_t *param_s) {
 #endif
 
   int slice_qdp = (int)(gl_qdp_leap - gl_qdp_s);  //stripe in ie axis of elem.state.Qdp
-  double *src_np1_qdp = (double *)(gl_qdp_s) + (np1_qdp - 1)*qsize_d*stripe_qdp;
-  double *src_n0_qdp = (double *)(gl_qdp_s) + (n0_qdp - 1)*qsize_d*stripe_qdp;
+  double *src_np1_qdp = (double *)(gl_qdp_s) + (np1_qdp - 1)*qsize*stripe_qdp;
+  double *src_n0_qdp = (double *)(gl_qdp_s) + (n0_qdp - 1)*qsize*stripe_qdp;
 
   double *src_qdp_ptr, *src_dp_ptr,  *src_divdp_proj_ptr, *src_Qtens_bi_ptr    \
       , *src_qmax_ptr, *src_qmin_ptr;
@@ -159,7 +158,7 @@ void slave_euler_step_(param_t *param_s) {
       }
     }
   }
-#if 0
+#if 1
   if (id == 0) {
     printf("slice_qdp:%d\n", slice_qdp);
   }

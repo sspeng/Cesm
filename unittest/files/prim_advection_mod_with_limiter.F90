@@ -1960,35 +1960,33 @@ type param_t
 end type param_t
 type(param_t) :: param_s
 
-!external :: slave_euler_divergence
+external :: slave_euler_limit
+type param_limit_t
+  integer*8 :: spheremp, qmax, qmin, Qtens_temp, Qtens_temp_test, dp_star_temp
+  integer :: nets, nete, qsize, limiter_option, step_elem
+end type param_limit_t
+type(param_limit_t) :: param_limit_s
+
+external :: slave_euler_v
 !type param_2d_t
-!  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
-!      , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp\
-!      , Qtens_temp, dp_star_temp
+!  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv         \
+!  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp      \
+!  , qmax, qmin
 !  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
-!  integer :: nets, nete, rhs_multiplier, qsize, qsize_d, n0_qdp, np1_qdp, limiter_option \
+!  integer :: nets, nete, rhs_multiplier, qsize, qsize_d, n0_qdp, np1_qdp, limiter_option\
 !      , rhs_viss
 !end type param_2d_t
 !type(param_2d_t) :: param_2d_s
 
-external :: slave_euler_v
-type param_2d_t
-  integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv         \
-  , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp      \
-  , qmax, qmin
-  real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
-  integer :: nets, nete, rhs_multiplier, qsize, qsize_d, n0_qdp, np1_qdp, limiter_option\
-      , rhs_viss
-end type param_2d_t
-type(param_2d_t) :: param_2d_s
-
-!external :: slave_euler_limit
-!type param_limit_t
-!  integer*8 :: spheremp, qmax, qmin, Qtens_temp, Qtens_temp_test, dp_star_temp
-!  integer :: nets, nete, qsize, limiter_option, step_elem
-!end type param_limit_t
-!type(param_limit_t) :: param_limit_s
-
+  type param_2d_t
+    integer*8 :: qdp_s_ptr, qdp_leap_ptr, divdp_proj, dp, vn0, Dvv, Dinv       \
+    , metdet, rmetdet, Qtens_biharmonic, divdp, dpdiss_biharmonic, spheremp    \
+    , qmax, qmin, Qtens_temp, dp_star_temp, dp_temp
+    real(kind=real_kind) :: dt, rrearth, nu_p, nu_q
+    integer :: nets, nete, rhs_multiplier, qsize, qsize_d, n0_qdp, np1_qdp, limiter_option \
+        , rhs_viss
+  end type param_2d_t
+  type(param_2d_t) :: param_2d_s
 call t_startf('sw_euler_step')
 
 do k = 1 , nlev
@@ -2237,21 +2235,52 @@ enddo
 
 #ifdef SW_EULER_STEP
 call t_startf('sw_div')
-  param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
-  param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
-  param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
-  param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
-  param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+!param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(:,:,:,:,:))
+!param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(:,:,:,:,:))
+!param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(:,:,:))
+!param_2d_s%dp = loc(elem(nets)%derived%dp(:,:,:))
+!param_2d_s%vn0 = loc(elem(nets)%derived%vn0(:,:,:,:))
+!param_2d_s%Dvv = loc(deriv%Dvv)
+!param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
+!param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
+!param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+!param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic(1,1,1,1,nets))
+!param_2d_s%divdp = loc(elem(nets)%derived%divdp)
+!param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
+!param_2d_s%spheremp = loc(elem(nets)%spheremp)
+!param_2d_s%qmax = loc(qmax(1,1,nets))
+!param_2d_s%qmin = loc(qmin(1,1,nets))
+!param_2d_s%dt = dt
+!param_2d_s%rrearth = rrearth
+!param_2d_s%nu_p = nu_p
+!param_2d_s%nu_q = nu_q
+!param_2d_s%nets = nets
+!param_2d_s%nete = nete
+!param_2d_s%rhs_multiplier = rhs_multiplier
+!param_2d_s%qsize = qsize
+!param_2d_s%qsize_d = qsize_d
+!param_2d_s%n0_qdp = n0_qdp
+!param_2d_s%np1_qdp = np1_qdp
+!param_2d_s%limiter_option = limiter_option
+!param_2d_s%rhs_viss = rhs_viss
+  param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(1,1,1,1,1))
+  param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(1,1,1,1,1))
+  param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(1,1,1))
+  param_2d_s%dp = loc(elem(nets)%derived%dp(1,1,1))
+  param_2d_s%vn0 = loc(elem(nets)%derived%vn0(1,1,1,1))
   param_2d_s%Dvv = loc(deriv%Dvv)
-  param_2d_s%Dinv = loc(elem(nets)%Dinv(:,:,:,:))
-  param_2d_s%metdet = loc(elem(nets)%metdet(:,:))
-  param_2d_s%rmetdet = loc(elem(nets)%rmetdet(:,:))
+  param_2d_s%Dinv = loc(elem(nets)%Dinv(1,1,1,1))
+  param_2d_s%metdet = loc(elem(nets)%metdet(1,1))
+  param_2d_s%rmetdet = loc(elem(nets)%rmetdet(1,1))
   param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic(1,1,1,1,nets))
   param_2d_s%divdp = loc(elem(nets)%derived%divdp)
   param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
   param_2d_s%spheremp = loc(elem(nets)%spheremp)
   param_2d_s%qmax = loc(qmax(1,1,nets))
   param_2d_s%qmin = loc(qmin(1,1,nets))
+  param_2d_s%Qtens_temp = loc(Qtens_temp(1,1,1,1,nets))
+  param_2d_s%dp_star_temp = loc(dp_star_temp(1,1,1,1,nets))
+  param_2d_s%dp_temp = loc(dp_temp(1,1,1,nets))
   param_2d_s%dt = dt
   param_2d_s%rrearth = rrearth
   param_2d_s%nu_p = nu_p
@@ -2267,49 +2296,19 @@ call t_startf('sw_div')
   param_2d_s%rhs_viss = rhs_viss
   call athread_spawn(slave_euler_v, param_2d_s)
   call athread_join()
-  !param_2d_s%qdp_s_ptr = loc(elem(nets)%state%Qdp(1,1,1,1,1))
-  !param_2d_s%qdp_leap_ptr = loc(elem((nets+1))%state%Qdp(1,1,1,1,1))
-  !param_2d_s%divdp_proj = loc(elem(nets)%derived%divdp_proj(1,1,1))
-  !param_2d_s%dp = loc(elem(nets)%derived%dp(1,1,1))
-  !param_2d_s%vn0 = loc(elem(nets)%derived%vn0(1,1,1,1))
-  !param_2d_s%Dvv = loc(deriv%Dvv)
-  !param_2d_s%Dinv = loc(elem(nets)%Dinv(1,1,1,1))
-  !param_2d_s%metdet = loc(elem(nets)%metdet(1,1))
-  !param_2d_s%rmetdet = loc(elem(nets)%rmetdet(1,1))
-  !param_2d_s%Qtens_biharmonic = loc(Qtens_biharmonic(1,1,1,1,nets))
-  !param_2d_s%divdp = loc(elem(nets)%derived%divdp)
-  !param_2d_s%dpdiss_biharmonic = loc(elem(nets)%derived%dpdiss_biharmonic)
-  !param_2d_s%spheremp = loc(elem(nets)%spheremp)
-  !param_2d_s%Qtens_temp = loc(Qtens_temp(1,1,1,1,nets))
-  !param_2d_s%dp_star_temp = loc(dp_star_temp(1,1,1,1,nets))
-  !param_2d_s%dt = dt
-  !param_2d_s%rrearth = rrearth
-  !param_2d_s%nu_p = nu_p
-  !param_2d_s%nu_q = nu_q
-  !param_2d_s%nets = nets
-  !param_2d_s%nete = nete
-  !param_2d_s%rhs_multiplier = rhs_multiplier
-  !param_2d_s%qsize = qsize
-  !param_2d_s%qsize_d = qsize_d
-  !param_2d_s%n0_qdp = n0_qdp
-  !param_2d_s%np1_qdp = np1_qdp
-  !param_2d_s%limiter_option = limiter_option
-  !param_2d_s%rhs_viss = rhs_viss
-  !call athread_spawn(slave_euler_divergence, param_2d_s)
-  !call athread_join()
-  !param_limit_s%spheremp = loc(elem(nets)%spheremp)
-  !param_limit_s%qmax = loc(qmax(1,1,nets))
-  !param_limit_s%qmin = loc(qmin(1,1,nets))
-  !param_limit_s%Qtens_temp = loc(Qtens_temp(1,1,1,1,nets))
-  !param_limit_s%Qtens_temp_test = loc(Qtens_temp_test(1,1,1,1,nets))
-  !param_limit_s%dp_star_temp = loc(dp_star_temp(1,1,1,1,nets))
-  !param_limit_s%nets = nets
-  !param_limit_s%nete = nete
-  !param_limit_s%qsize = qsize
-  !param_limit_s%limiter_option = limiter_option
-  !param_limit_s%step_elem = (loc(elem(nets+1)%spheremp) - loc(elem(nets)%spheremp))/8
-  !call athread_spawn(slave_euler_limit, param_limit_s)
-  !call athread_join()
+  param_limit_s%spheremp = loc(elem(nets)%spheremp)
+  param_limit_s%qmax = loc(qmax(1,1,nets))
+  param_limit_s%qmin = loc(qmin(1,1,nets))
+  param_limit_s%Qtens_temp = loc(Qtens_temp(1,1,1,1,nets))
+  param_limit_s%Qtens_temp_test = loc(Qtens_temp_test(1,1,1,1,nets))
+  param_limit_s%dp_star_temp = loc(dp_star_temp(1,1,1,1,nets))
+  param_limit_s%nets = nets
+  param_limit_s%nete = nete
+  param_limit_s%qsize = qsize
+  param_limit_s%limiter_option = limiter_option
+  param_limit_s%step_elem = (loc(elem(nets+1)%spheremp) - loc(elem(nets)%spheremp))/8
+  call athread_spawn(slave_euler_limit, param_limit_s)
+  call athread_join()
 call t_stopf('sw_div')
 #else
 call t_startf('local_div')
@@ -2409,7 +2408,9 @@ do ie = nets, nete
   enddo
 enddo
 
-call t_startf('limiter_optim_iter_full_local')
+call t_stopf('local_div')
+#endif
+
 do ie = nets, nete
   do q = 1, qsize
     if ( limiter_option == 8) then
@@ -2422,6 +2423,27 @@ do ie = nets, nete
   enddo
 enddo
 
+
+call counter(count)
+
+!#define CHECK
+#ifdef CHECK
+if (iam == 0) then
+  do ie = nets, nete
+    do q = 1, qsize
+      do k = 1, nlev
+        do j = 1, np
+          do i = 1, np
+            if (Qtens_temp(i,j,k,q,ie) /= Qtens_temp_test(i,j,k,q,ie)) then
+              print *, "check>>>>", count, ie, q, k, j, i, Qtens_temp(i,j,k,q,ie), Qtens_temp_test(i,j,k,q,ie) , Qtens_temp(i,j,k,q,ie) - Qtens_temp_test(i,j,k,q,ie), nets, nete, nlev
+            endif
+          enddo
+        enddo
+      enddo
+    enddo
+  enddo
+endif
+#endif
 ! apply mass matrix, overwrite np1 with solution:
 ! dont do this earlier, since we allow np1_qdp == n0_qdp
 ! and we dont want to overwrite n0_qdp until we are done using it
@@ -2444,25 +2466,23 @@ do ie = nets, nete
     endif
   enddo
 enddo
-call t_stopf('limiter_optim_iter_full_local')
 
-call t_stopf('local_div')
-#endif
-do ie = nets, nete
-  do q = 1, qsize
-    if ( limiter_option == 4 ) then
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-      ! sign-preserving limiter, applied after mass matrix
-      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
-      call t_startf('limiter_option4')
-      call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
-      call t_stopf('limiter_option4')
-      !if (iam == 1) then
-      !  print *, "limiter>>>>>>>>>>>>>>>>>>>>>"
-      !endif
-    endif
-  enddo
-enddo
+
+!do ie = nets, nete
+!  do q = 1, qsize
+!    if ( limiter_option == 4 ) then
+!      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+!      ! sign-preserving limiter, applied after mass matrix
+!      !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!1
+!      call t_startf('limiter_option4')
+!      call limiter2d_zero( elem(ie)%state%Qdp(:,:,:,q,np1_qdp))
+!      call t_stopf('limiter_option4')
+!      if (iam == 1) then
+!        print *, "limiter>>>>>>>>>>>>>>>>>>>>>"
+!      endif
+!    endif
+!  enddo
+!enddo
 
 call t_startf('sw_edgePack')
 do ie = nets, nete
@@ -2530,16 +2550,16 @@ call t_stopf('sw_euler_step')
 #undef PRINT
 #ifdef PRINT
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!! oouput test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  if (iam == 0) then
+  if (iam == 1) then
     print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
-    do ie = nets, nete
-      do q = 1, qsize
-        do k = 1, nlev
-          print *, elem(ie)%state%Qdp(np,np,k,q,np1_qdp), elem(ie)%state%Qdp(np,np,k,q,n0_qdp)
-        enddo
-      enddo
-    enddo
-    !print *, iam, nets, nete, qsize,qsize_d, n0_qdp, np1_qdp
+    !do ie = nets, nete
+    !  do q = 1, qsize
+    !    do k = 1, nlev
+    !      print *, elem(ie)%state%Qdp(np,np,k,q,np1_qdp), elem(ie)%state%Qdp(np,np,k,q,n0_qdp)
+    !    enddo
+    !  enddo
+    !enddo
+    print *, iam, nets, nete, qsize,qsize_d, n0_qdp, np1_qdp
     print *, "sw>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>"
   endif
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!! output test data !!!!!!!!!!!!!!!!!!!!!!!!!!!!!

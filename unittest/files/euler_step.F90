@@ -538,3 +538,109 @@ end subroutine euler_step
 
   end subroutine limiter_optim_iter_full
 #endif
+
+
+subroutine divergence_sphere(v,deriv,elem,div)
+!
+!   input:  v = velocity in lat-lon coordinates
+!   ouput:  div(v)  spherical divergence of v
+!
+
+use perf_mod      , only : t_startf, t_stopf
+  real(kind=real_kind), intent(in) :: v(np,np,2)  ! in lat-lon coordinates
+  type (derivative_t), intent(in) :: deriv
+  type (element_t), intent(in) :: elem
+  real(kind=real_kind) :: div(np,np)
+
+  ! Local
+
+  integer i
+  integer j
+  integer l
+
+  real(kind=real_kind) ::  dudx00
+  real(kind=real_kind) ::  dvdy00
+  real(kind=real_kind) ::  gv(np,np,2),vvtemp(np,np)
+
+  ! convert to contra variant form and multiply by g
+  !OMP_COLLAPSE_SIMD
+  !DIR_VECTOR_ALIGNED
+  do j=1,np
+     do i=1,np
+        gv(i,j,1)=elem%metdet(i,j)*(elem%Dinv(i,j,1,1)*v(i,j,1) + elem%Dinv(i,j,1,2)*v(i,j,2))
+        gv(i,j,2)=elem%metdet(i,j)*(elem%Dinv(i,j,2,1)*v(i,j,1) + elem%Dinv(i,j,2,2)*v(i,j,2))
+     enddo
+  enddo
+
+  ! compute d/dx and d/dy
+  do j=1,np
+     do l=1,np
+        dudx00=0.0d0
+        dvdy00=0.0d0
+!DIR$ UNROLL(NP)
+        do i=1,np
+           dudx00 = dudx00 + deriv%Dvv(i,l  )*gv(i,j  ,1)
+           dvdy00 = dvdy00 + deriv%Dvv(i,l  )*gv(j  ,i,2)
+        end do
+        div(l  ,j  ) = dudx00
+        vvtemp(j  ,l  ) = dvdy00
+     end do
+  end do
+
+  !OMP_COLLAPSE_SIMD
+  !DIR_VECTOR_ALIGNED
+  do j=1,np
+     do i=1,np
+        div(i,j)=(div(i,j)+vvtemp(i,j))*(elem%rmetdet(i,j)*rrearth)
+     end do
+  end do
+end subroutine divergence_sphere
+
+
+subroutine limiter2d_zero(Q)
+! mass conserving zero limiter (2D only).  to be called just before DSS
+!
+! this routine is called inside a DSS loop, and so Q had already
+! been multiplied by the mass matrix.  Thus dont include the mass
+! matrix when computing the mass = integral of Q over the element
+!
+! ps is only used when advecting Q instead of Qdp
+! so ps should be at one timelevel behind Q
+implicit none
+real (kind=real_kind), intent(inout) :: Q(np,np,nlev)
+
+! local
+real (kind=real_kind) :: dp(np,np)
+real (kind=real_kind) :: mass,mass_new,ml
+integer i,j,k
+
+do k = nlev , 1 , -1
+  mass = 0
+  do j = 1 , np
+    do i = 1 , np
+      !ml = Q(i,j,k)*dp(i,j)*spheremp(i,j)  ! see above
+      ml = Q(i,j,k)
+      mass = mass + ml
+    enddo
+  enddo
+
+  ! negative mass.  so reduce all postive values to zero
+  ! then increase negative values as much as possible
+  if ( mass < 0 ) Q(:,:,k) = -Q(:,:,k)
+  mass_new = 0
+  do j = 1 , np
+    do i = 1 , np
+      if ( Q(i,j,k) < 0 ) then
+        Q(i,j,k) = 0
+      else
+        ml = Q(i,j,k)
+        mass_new = mass_new + ml
+      endif
+    enddo
+  enddo
+
+  ! now scale the all positive values to restore mass
+  if ( mass_new > 0 ) Q(:,:,k) = Q(:,:,k) * abs(mass) / mass_new
+  if ( mass     < 0 ) Q(:,:,k) = -Q(:,:,k)
+enddo
+end subroutine limiter2d_zero

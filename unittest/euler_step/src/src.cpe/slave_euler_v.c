@@ -1,4 +1,3 @@
-
 #include <slave.h>
 #include "dma_macros.h"
 //#include "ldm_alloc.h"
@@ -59,7 +58,7 @@ typedef struct {
       *rmetdet, *Qtens_biharmonic, *divdp, *dpdiss_biharmonic,                 \
       *spheremp, *qmax, *qmin;
   double dt, rrearth, nu_p, nu_q;
-  int nets, nete, rhs_multiplier, qsize, qsize_d, n0_qdp, np1_qdp, limiter_option       \
+  int nets, nete, rhs_multiplier, qsize, n0_qdp, np1_qdp, limiter_option       \
       , rhs_viss;
 } param_t;
 
@@ -96,7 +95,6 @@ void slave_euler_v_(param_t *param_s) {
   int nete = param_d.nete;
   int rhs_multiplier = param_d.rhs_multiplier;
   int qsize = param_d.qsize;
-  int qsize_d = param_d.qsize_d;
   int n0_qdp = param_d.n0_qdp;
   int np1_qdp = param_d.np1_qdp;
   int limiter_option = param_d.limiter_option;
@@ -159,8 +157,8 @@ void slave_euler_v_(param_t *param_s) {
   double *src_qdp, *src_qdp_np1, *src_dp, *src_vn0, *src_divdp_proj, *src_Dinv,\
      *src_metdet, *src_rmetdet, *src_Qtens_biharmonic, *src_divdp,             \
      *src_dpdiss_biharmonic, *src_spheremp, *src_qmax, *src_qmin;              \
-  double *gl_n0_qdp = gl_qdp + (n0_qdp - 1)*qsize_d*stripe_qdp;
-  double *gl_np1_qdp = gl_qdp + (np1_qdp - 1)*qsize_d*stripe_qdp;
+  double *gl_n0_qdp = gl_qdp + (n0_qdp - 1)*qsize*stripe_qdp;
+  double *gl_np1_qdp = gl_qdp + (np1_qdp - 1)*qsize*stripe_qdp;
 
   // Divide ie-axis data on the row cpe with loop_r
   // the value of loop_r rely on NR, UR; NP is the number of cloumn cpe,
@@ -315,8 +313,69 @@ void slave_euler_v_(param_t *param_s) {
                   }
                 }
               }
-              limiter_optim_iter_full_f_(Qtens_temp, spheremp    \
-                  , &qmin[q*NLEV], &qmax[q*NLEV], dp_star);
+              // start of function limiter_optim_iter_full
+              for (k = 0; k < NLEV; k++) {
+                for (k1 = 0; k1 < NP*NP; k1++) {
+                  int pos_dp_star = k*NP*NP + k1;
+                  int pos_Qtens = k*NP*NP + k1;
+                  cc[k1] = spheremp[k1]*dp_star[pos_dp_star];
+                  xx[k1] = Qtens_temp[pos_Qtens]/dp_star[pos_dp_star];
+                }  // end loop k
+                // implement the function sum which same as sum(c) in fortran
+                // implement the function sum(c*x)
+                // sum_array_multiply(mass, cc, xx, NP*NP, double)
+                sum_array(sumc, cc, NP*NP);
+                if (sumc <= 0) continue;
+                sum_array_multiply(mass, cc, xx);
+                int pos_qmax = q*NLEV + k;
+                if (mass < qmin[pos_qmax]*sumc) qmin[pos_qmax] = mass/sumc;
+                if (mass > qmax[pos_qmax]*sumc) qmax[pos_qmax] = mass/sumc;
+                for (iter = 0; iter < maxiter; iter++) {
+                  addmass = 0.0;
+                  for (k1 = 0; k1 < NP*NP; k1++) {
+                    if(xx[k1] > qmax[pos_qmax]) {
+                      addmass = addmass + (xx[k1] - qmax[pos_qmax])*cc[k1];
+                      xx[k1] = qmax[pos_qmax];
+                    }
+                    if(xx[k1] < qmin[pos_qmax]) {
+                      addmass = addmass - (qmin[pos_qmax] - xx[k1])*cc[k1];
+                      xx[k1] = qmin[pos_qmax];
+                    }
+                  }  // end loop k1
+                  double addmass_abs;
+                  double mass_abs;
+                  abs(mass, mass_abs);
+                  abs(addmass, addmass_abs);
+                  if (addmass_abs <= tol_limiter*mass_abs) break;
+                  weightssum = 0.0;
+                  if (addmass > 0) {
+                    for (k1 = 0; k1 < NP*NP; k1++)
+                      if (xx[k1] < qmax[pos_qmax])
+                        weightssum = weightssum + cc[k1];
+                    for (k1 = 0; k1 < NP*NP; k1++)
+                      if (xx[k1] < qmax[pos_qmax])
+                        xx[k1] = xx[k1] + addmass/weightssum;
+                  } else {
+                    for (k1 = 0; k1 < NP*NP; k1++)
+                      if (xx[k1] > qmin[pos_qmax])
+                        weightssum = weightssum + cc[k1];
+                    for (k1 = 0; k1 < NP*NP; k1++)
+                      if (xx[k1] > qmin[pos_qmax])
+                        xx[k1] = xx[k1] + addmass/weightssum;
+                  }
+                }  // end loop iter
+                for (k1 = 0; k1 < NP*NP; k1++) {
+                  int pos_Qtens = k*NP*NP + k1;
+                  Qtens_temp[pos_Qtens] = xx[k1];
+                }
+              }   // end loop k
+              for (k = 0; k < NLEV; k++) {
+                for (k1 = 0; k1 < NP*NP; k1++) {
+                  int pos_Qtens = k*NP*NP + k1;
+                  int pos_dp_star = k*NP*NP + k1;
+                  Qtens_temp[pos_Qtens] = Qtens_temp[pos_Qtens]*dp_star[pos_dp_star];
+                }
+              }  // end function limiter_optim_iter_full
             }   // end if limiter_option = 8
             for (k = 0; k < NLEV; k++) {
               for (j = 0; j < NP; j++) {
@@ -337,8 +396,18 @@ void slave_euler_v_(param_t *param_s) {
       }
     }
   }
+
 #if 0
-  if (id == 0)
-    printf("value:%lf\n", (tol_limiter*5E-3*5.82989072416270755E-290));
+  if (id == 0) {
+    //double abs_org = -6.03504589485943894689494646;
+    //double abs_test1 = 6.454934674584580238594;
+    //double abs_aft;
+    //abs(abs_org, abs_aft);
+    //printf("abs_org:%.20lf, abs_aft:%.20lf\n", abs_org, abs_aft);
+    double a;
+    printf("a:%lf\n", a);
+    a = a + 1;
+    printf("a:%lf\n", a);
+  }
 #endif
 }

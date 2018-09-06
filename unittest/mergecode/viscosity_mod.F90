@@ -210,8 +210,9 @@ logical var_coef1
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end subroutine
 
-
 #ifdef _PRIM
+#define SW_BIHARMONIC_WK_DP3D_SLAVE
+#define SW_BIHARMONIC_WK_DP3D_PACK_UNPACK
 subroutine biharmonic_wk_dp3d(elem,dptens,ptens,vtens,deriv,edge3,hybrid,nt,nets,nete)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 ! compute weak biharmonic operator
@@ -219,6 +220,18 @@ subroutine biharmonic_wk_dp3d(elem,dptens,ptens,vtens,deriv,edge3,hybrid,nt,nets
 !    output: ptens,vtens  overwritten with weak biharmonic of h,v (output in lat-lon coordinates)
 !
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#ifdef SW_BIHARMONIC_WK_DP3D_SLAVE
+	use physical_constants, only :rrearth
+  use control_mod, only : hypervis_scaling, hypervis_power
+#endif
+#ifdef SW_BIHARMONIC_WK_DP3D_PACK_UNPACK
+  use control_mod, only : nu, nu_div, nu_s, hypervis_order, hypervis_subcycle, nu_p, nu_top, psurf_vis, north, south, east, west, swest
+	use spmd_utils, only: iam
+  use kinds, only : real_kind, int_kind, iulog
+  use dimensions_mod, only : np, np, nlev, max_corner_elem
+#endif
+use perf_mod, only: t_startf, t_stopf, t_barrierf, t_adj_detailf ! _EXTERNAL
+
 type (hybrid_t)      , intent(in) :: hybrid
 type (element_t)     , intent(inout), target :: elem(:)
 integer :: nt,nets,nete
@@ -234,6 +247,60 @@ real (kind=real_kind), dimension(np,np) :: tmp
 real (kind=real_kind), dimension(np,np,2) :: v
 real (kind=real_kind) :: nu_ratio1, nu_ratio2
 logical var_coef1
+#ifdef SW_BIHARMONIC_WK_DP3D_SLAVE
+	!SUNWAY
+	!struct declearation
+	type str_g
+		integer(kind=8)	:: ptr_e_T,ptr_e_dp3d,ptr_ptens,ptr_dptens,& !lap
+		ptr_e_variable_hyperviscosity,ptr_e_tensorVisc,&
+		ptr_e_Dinv,ptr_d_Dvv,ptr_e_spheremp,&
+		ptr_e_v,ptr_vtens,ptr_e_vec_cart,ptr_e_metdet,	&!vlap
+		ptr_e_rmetdet,ptr_e_Dvv,ptr_e_D,ptr_e_mp,ptr_e_metinv
+		real(kind=8)	:: hypervis_power,hypervis_scaling,rrearth,& !lap
+		nu_ratio !vlap
+		integer var_coef
+		integer :: nets,nete,nlev,np,len_elem,len_ptens,len_dptens,len_vtens
+	end type str_g
+	type str_h
+		integer(kind=8)	:: ptr_e_rspheremp,ptr_ptens,ptr_dptens,&!lap
+			ptr_e_variable_hyperviscosity,ptr_e_tensorVisc,&
+			ptr_e_Dinv,ptr_d_Dvv,ptr_e_spheremp,&
+			ptr_vtens,ptr_e_vec_cart,ptr_e_metdet,	&!vlap
+			ptr_e_rmetdet,ptr_e_Dvv,ptr_e_D,ptr_e_mp,ptr_e_metinv
+		real(kind=8)	:: hypervis_power,hypervis_scaling,rrearth,&!lap
+			nu_ratio2 !vlap
+		integer var_coef
+		integer :: nets,nete,nlev,np,len_elem,len_ptens,len_dptens,len_vtens;
+	end type str_h
+	!slave function declearation
+	external	:: slave_advance_hypervis_dp_kernelg
+	external	:: slave_advance_hypervis_dp_kernelh
+	! inputs for slave function
+	type(str_g)	:: strpar_g
+	type(str_h)	:: strpar_h
+#endif
+  !-------------------for edgeVpack slave kernel---------------------------
+#ifdef SW_BIHARMONIC_WK_DP3D_PACK_UNPACK
+  type param_t
+    integer(kind=8) :: buf
+    integer(kind=8) :: receive
+    integer(kind=8) :: addrs(3)
+    integer(kind=8) :: putmap_addr
+    integer(kind=8) :: getmap_addr
+    integer(kind=8) :: reverse_addr
+    integer(kind=8) :: iwesn_addr
+    integer(kind=4) :: np, nlev, nets, nete, max_corner_elem, iam
+  end type
+  type(param_t) :: param
+  integer (kind=int_kind), dimension(:,:), allocatable :: putmap
+  integer (kind=int_kind), dimension(:,:), allocatable :: getmap
+  integer (kind=int_kind), dimension(:,:), allocatable :: iwesn
+  integer (kind=int_kind), dimension(:,:), allocatable :: reverse
+  external :: slave_edgevpack3_parallel
+  external :: slave_edgevunpack3_parallel
+	!local
+	integer i
+#endif
 
    !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
    !so tensor is only used on second call to laplace_sphere_wk
@@ -259,7 +326,50 @@ logical var_coef1
       endif
    endif
 
+		call t_startf("kernel-g")
+#ifdef SW_BIHARMONIC_WK_DP3D_SLAVE
+		!SUNWAY KernelG
+		!lap
+		strpar_g%ptr_e_T=loc(elem(1)%state%T(1,1,1,nt))			!str_par%ptr_T
+		strpar_g%ptr_e_dp3d=loc(elem(1)%state%dp3d(1,1,1,nt))
+		strpar_g%ptr_ptens=loc(ptens(1,1,1,1))
+		strpar_g%ptr_dptens=loc(dptens(1,1,1,1))
+		strpar_g%ptr_e_variable_hyperviscosity=loc(elem(1)%variable_hyperviscosity(1,1))
+		strpar_g%ptr_e_tensorVisc=loc(elem(1)%tensorVisc(1,1,1,1))
+		strpar_g%ptr_e_Dinv=loc(elem(1)%Dinv(1,1,1,1))
+		strpar_g%ptr_d_Dvv=loc(deriv%Dvv(1,1))
+		strpar_g%ptr_e_spheremp=loc(elem(1)%spheremp(1,1))
+		strpar_g%hypervis_power=hypervis_power
+		strpar_g%hypervis_scaling=hypervis_scaling
+		strpar_g%rrearth=rrearth
+		if(var_coef1) then
+			strpar_g%var_coef=1
+		else
+			strpar_g%var_coef=0
+		endif
+		strpar_g%nets=nets
+		strpar_g%nete=nete
+		strpar_g%nlev=nlev
+		strpar_g%np=np
+		strpar_g%len_elem=(loc(elem(2))-loc(elem(1)))/8
+		strpar_g%len_ptens=(loc(ptens(1,1,1,2))-loc(ptens(1,1,1,1)))/8
+		strpar_g%len_dptens=(loc(dptens(1,1,1,2))-loc(dptens(1,1,1,1)))/8
+		!vlap-0
+		strpar_g%ptr_e_vec_cart=loc(elem(1)%vec_sphere2cart(1,1,1,1))
+		strpar_g%ptr_e_v=loc(elem(1)%state%v(1,1,1,1,nt))
+		strpar_g%ptr_vtens=loc(vtens(1,1,1,1,1))
+		!vlap
+		strpar_g%ptr_e_metdet=loc(elem(1)%metdet(1,1))
+		strpar_g%ptr_e_rmetdet=loc(elem(1)%rmetdet(1,1))
+		strpar_g%ptr_e_D=loc(elem(1)%D(1,1,1,1))
+		strpar_g%ptr_e_mp=loc(elem(1)%mp(1,1))
+		strpar_g%ptr_e_metinv=loc(elem(1)%metinv(1,1,1,1))
+		strpar_g%nu_ratio=nu_ratio1
+		strpar_g%len_vtens=(loc(vtens(1,1,1,1,2))-loc(vtens(1,1,1,1,1)))/8
+		call athread_spawn(slave_advance_hypervis_dp_kernelg,strpar_g)
+		call athread_join()
 
+#else
    do ie=nets,nete
 
 #if (defined COLUMN_OPENMP)
@@ -277,26 +387,172 @@ logical var_coef1
          call vlaplace_sphere_wk(elem(ie)%state%v(:,:,:,k,nt),deriv,elem(ie),&
               vtens(:,:,:,k,ie), var_coef=var_coef1,nu_ratio=nu_ratio1)
       enddo
-      kptr=0
-      call edgeVpack(edge3, ptens(1,1,1,ie),nlev,kptr,ie)
-      kptr=nlev
-      call edgeVpack(edge3, vtens(1,1,1,1,ie),2*nlev,kptr,ie)
-      kptr=3*nlev
-      call edgeVpack(edge3, dptens(1,1,1,ie),nlev,kptr,ie)
-
    enddo
+#endif
+		call t_stopf("kernel-g")
 
-   call bndry_exchangeV(hybrid,edge3)
+#ifdef SW_BIHARMONIC_WK_DP3D_PACK_UNPACK
+		call t_startf("kernel-g-pack")
+!		do ie=nets,nete
+!			kptr=0
+!			call edgeVpack(edge3, ptens(1,1,1,ie),nlev,kptr,ie)
+!			kptr=nlev
+!			call edgeVpack(edge3, vtens(1,1,1,1,ie),2*nlev,kptr,ie)
+!			kptr=3*nlev
+!			call edgeVpack(edge3, dptens(1,1,1,ie),nlev,kptr,ie)
+!		enddo
+	  allocate(putmap(swest:swest+4*max_corner_elem-1,nets:nete))
+	  allocate(getmap(swest:swest+4*max_corner_elem-1,nets:nete))
+	  allocate(iwesn(1:4,nets:nete))
+	  allocate(reverse(1:4,nets:nete))
+        do ie = nets, nete
+          iwesn(1, ie)=edge3%putmap(west, ie)
+          iwesn(2, ie)=edge3%putmap(east, ie)
+          iwesn(3, ie)=edge3%putmap(south, ie)
+          iwesn(4, ie)=edge3%putmap(north, ie)
+         do i = swest, swest+4*max_corner_elem-1
+           putmap(i, ie)=edge3%putmap(i, ie)
+	   enddo
+          if ( edge3%reverse(west, ie) ) then
+            reverse(1, ie)=1
+          else
+            reverse(1, ie)=0
+          end if
+          if ( edge3%reverse(east, ie) ) then
+            reverse(2, ie)=1
+          else
+            reverse(2, ie)=0
+          end if
+          if ( edge3%reverse(south, ie) ) then
+            reverse(3, ie)=1
+          else
+            reverse(3, ie)=0
+          end if
+          if ( edge3%reverse(north, ie) ) then
+            reverse(4, ie)=1
+          else
+            reverse(4, ie)=0
+          end if
+        enddo
+        param%addrs(1)=loc(ptens)
+        param%addrs(2)=loc(vtens)
+        param%addrs(3)=loc(dptens)
+!        param%buf = loc(retbuf)
+        param%buf = loc(edge3%buf)
+        param%receive = loc(edge3%receive)
+	  param%getmap_addr = loc(getmap)
+	  param%iwesn_addr =loc(iwesn)
+	  param%putmap_addr = loc(putmap)
+	  param%reverse_addr =loc(reverse)
+        param%np = np
+        param%nlev = nlev
+        param%nets = nets
+        param%nete = nete
+        param%max_corner_elem = max_corner_elem
+        param%iam = iam
 
+        call athread_spawn(slave_edgevpack3_parallel, param)
+        call athread_join()
+		call t_stopf("kernel-g-pack")
+
+		call t_startf("bndry_exchangeV-2")
+		call bndry_exchangeV(hybrid,edge3)
+		call t_stopf("bndry_exchangeV-2")
+
+		call t_startf("kernel-h-unpack")
+!		do ie=nets,nete
+!			kptr=0
+!			call edgeVunpack(edge3, ptens(1,1,1,ie), nlev, kptr, ie)
+!			kptr=nlev
+!			call edgeVunpack(edge3, vtens(1,1,1,1,ie), 2*nlev, kptr, ie)
+!			kptr=3*nlev
+!			call edgeVunpack(edge3, dptens(1,1,1,ie), nlev, kptr, ie)
+!		enddo
+	  do ie = nets, nete
+	    do i = swest, swest+4*max_corner_elem-1
+            getmap(i, ie) = edge3%getmap(i, ie)
+	    enddo
+	    iwesn(1, ie) = edge3%getmap(west,ie)
+          iwesn(2, ie) = edge3%getmap(east,ie)
+	    iwesn(3, ie) = edge3%getmap(south,ie)
+	    iwesn(4, ie) = edge3%getmap(north,ie)
+	  enddo
+
+       call athread_spawn(slave_edgevunpack3_parallel, param)
+       call athread_join()
+
+	  deallocate(getmap)
+	  deallocate(putmap)
+	  deallocate(iwesn)
+	  deallocate(reverse)
+
+		call t_stopf("kernel-h-unpack")
+#else
+		call t_startf("kernel-g-pack")
+		do ie=nets,nete
+			kptr=0
+			call edgeVpack(edge3, ptens(1,1,1,ie),nlev,kptr,ie)
+			kptr=nlev
+			call edgeVpack(edge3, vtens(1,1,1,1,ie),2*nlev,kptr,ie)
+			kptr=3*nlev
+			call edgeVpack(edge3, dptens(1,1,1,ie),nlev,kptr,ie)
+		enddo
+		call t_stopf("kernel-g-pack")
+
+		call t_startf("bndry_exchangeV-2")
+		call bndry_exchangeV(hybrid,edge3)
+		call t_stopf("bndry_exchangeV-2")
+
+		call t_startf("kernel-h-unpack")
+		do ie=nets,nete
+			kptr=0
+			call edgeVunpack(edge3, ptens(1,1,1,ie), nlev, kptr, ie)
+			kptr=nlev
+			call edgeVunpack(edge3, vtens(1,1,1,1,ie), 2*nlev, kptr, ie)
+			kptr=3*nlev
+			call edgeVunpack(edge3, dptens(1,1,1,ie), nlev, kptr, ie)
+		enddo
+		call t_stopf("kernel-h-unpack")
+#endif
+
+		call t_startf("kernel-h")
+#ifdef SW_BIHARMONIC_WK_DP3D_SLAVE
+		strpar_h%ptr_e_rspheremp=loc(elem(1)%rspheremp(1,1))
+		strpar_h%ptr_ptens=loc(ptens(1,1,1,1))
+		strpar_h%ptr_dptens=loc(dptens(1,1,1,1))
+		strpar_h%ptr_e_variable_hyperviscosity=loc(elem(1)%variable_hyperviscosity(1,1))
+		strpar_h%ptr_e_tensorVisc=loc(elem(1)%tensorVisc(1,1,1,1))
+		strpar_h%ptr_e_Dinv=loc(elem(1)%Dinv(1,1,1,1))
+		strpar_h%ptr_d_Dvv=loc(deriv%Dvv(1,1))
+		strpar_h%ptr_e_spheremp=loc(elem(1)%spheremp(1,1))
+		strpar_h%hypervis_power=hypervis_power
+		strpar_h%hypervis_scaling=hypervis_scaling
+		strpar_h%rrearth=rrearth
+		strpar_h%var_coef=1 !true
+		strpar_h%nets=nets
+		strpar_h%nete=nete
+		strpar_h%nlev=nlev
+		strpar_h%np=np
+		strpar_h%len_elem=(loc(elem(2))-loc(elem(1)))/8
+		strpar_h%len_ptens=(loc(ptens(1,1,1,2))-loc(ptens(1,1,1,1)))/8
+		strpar_h%len_dptens=(loc(dptens(1,1,1,2))-loc(dptens(1,1,1,1)))/8
+		!vlap-0
+		strpar_h%ptr_e_vec_cart=loc(elem(1)%vec_sphere2cart(1,1,1,1))
+		strpar_h%ptr_vtens=loc(vtens(1,1,1,1,1))
+		!vlap
+		strpar_h%ptr_e_metdet=loc(elem(1)%metdet(1,1))
+		strpar_h%ptr_e_rmetdet=loc(elem(1)%rmetdet(1,1))
+		strpar_h%ptr_e_D=loc(elem(1)%D(1,1,1,1))
+		strpar_h%ptr_e_mp=loc(elem(1)%mp(1,1))
+		strpar_h%ptr_e_metinv=loc(elem(1)%metinv(1,1,1,1))
+		strpar_h%nu_ratio2=nu_ratio2
+		strpar_h%len_vtens=(loc(vtens(1,1,1,1,2))-loc(vtens(1,1,1,1,1)))/8
+		call athread_spawn(slave_advance_hypervis_dp_kernelh,strpar_h)
+		call athread_join()
+
+#else
    do ie=nets,nete
       rspheremv     => elem(ie)%rspheremp(:,:)
-
-      kptr=0
-      call edgeVunpack(edge3, ptens(1,1,1,ie), nlev, kptr, ie)
-      kptr=nlev
-      call edgeVunpack(edge3, vtens(1,1,1,1,ie), 2*nlev, kptr, ie)
-      kptr=3*nlev
-      call edgeVunpack(edge3, dptens(1,1,1,ie), nlev, kptr, ie)
 
       ! apply inverse mass matrix, then apply laplace again
 #if (defined COLUMN_OPENMP)
@@ -319,6 +575,8 @@ logical var_coef1
 
       enddo
    enddo
+#endif
+		call t_stopf("kernel-h")
 #ifdef DEBUGOMP
 #if (defined HORIZ_OPENMP)
 !$OMP BARRIER
@@ -433,7 +691,6 @@ end subroutine
     param_s%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
     call athread_spawn(slave_biharmonic_wk_scalar, param_s)
     call athread_join()
-    call t_stopf('sw_biharmonic_1')
 
     call t_startf('bndry_exchangeV_bi')
     call bndry_exchangeV(hybrid,edgeq)

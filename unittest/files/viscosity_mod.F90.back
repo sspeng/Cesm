@@ -327,203 +327,314 @@ logical var_coef1
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 end subroutine
 
-#define BIHARMONIC_SW
-#ifdef BIHARMONIC_SW
-  subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! compute weak biharmonic operator
-  !    input:  qtens = Q
-  !    output: qtens = weak biharmonic of Q
-  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-    use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
-    use physical_constants, only : rrearth
-    use control_mod, only : hypervis_scaling, hypervis_power
-    use control_mod, only : north, south, east, west, neast, nwest, seast, swest
-    type (hybrid_t)      , intent(in) :: hybrid
-    type (element_t)     , intent(inout), target :: elem(:)
-    integer :: nets,nete
-    real (kind=real_kind), dimension(np,np,nlev,qsize,nets:nete) :: qtens
-    type (EdgeBuffer_t)  , intent(inout) :: edgeq
-    type (derivative_t)  , intent(in) :: deriv
+subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+! compute weak biharmonic operator
+!    input:  qtens = Q
+!    output: qtens = weak biharmonic of Q
+!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+#define SW_BIHARMONIC
+#ifdef SW_BIHARMONIC
 
-    ! local
-    integer :: k,kptr,i,j,ie,ic,q,l,m,n
-    real (kind=real_kind), dimension(np,np) :: lap_p
-    logical var_coef1
+use perf_mod      , only : t_startf, t_stopf            ! _EXTERNAL
+use physical_constants, only : rrearth
+use control_mod, only : hypervis_scaling, hypervis_power
+use control_mod, only : north, south, east, west, neast, nwest, seast, swest
+type (hybrid_t)      , intent(in) :: hybrid
+type (element_t)     , intent(inout), target :: elem(:)
+integer :: nets,nete
+real (kind=real_kind), dimension(np,np,nlev,qsize,nets:nete) :: qtens
+type (EdgeBuffer_t)  , intent(inout) :: edgeq
+type (derivative_t)  , intent(in) :: deriv
 
-    logical :: var_coef
+! local
+integer :: k,kptr,i,j,ie,ic,q,l,m,n
+real (kind=real_kind), dimension(np,np) :: lap_p
+logical var_coef1
 
-    ! Local
-    real(kind=real_kind) :: grads(np,np,2), oldgrads(np,np,2)
+logical :: var_coef
 
-    !call gradient_sphere(s,deriv,elem%Dinv, grads)
+  ! Local
+  real(kind=real_kind) :: grads(np,np,2), oldgrads(np,np,2)
 
-    real(kind=real_kind) ::  dsdx00
-    real(kind=real_kind) ::  dsdy00
-    real(kind=real_kind) ::  v1(np,np),v2(np,np)
-
-    real(kind=real_kind) ::  vtemp(np,np,2)
-    integer :: reverse(4, nets:nete)
-
-    integer :: step_elem
-    external :: slave_biharmonic_wk_scalar
-    external :: slave_biharmonic_wk_scalar_2
-    type param_t
-      integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
-          , Dvv, buf
-      integer*8 :: putmap, reverse
-      real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
-      integer :: nets, nete, qsize, step_elem
-    end type param_t
-    type(param_t) :: param_s
-    type param_2_t
-      integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
-          , Dvv, receive
-      integer*8 :: getmap
-      real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
-      integer :: nets, nete, qsize, step_elem
-    end type param_2_t
-    type(param_2_t) :: param_s2
-
-    var_coef1 = .true.
-    if(hypervis_scaling > 0)    var_coef1 = .false.
-
-    call t_startf('sw_biharmonic_1')
-    do ie = nets, nete
-      if (edgeq%reverse(west, ie)) then
-        reverse(1, ie) = 1
-      else
-        reverse(1, ie) = 0
-      endif
-      if (edgeq%reverse(east, ie)) then
-        reverse(2, ie) = 1
-      else
-        reverse(2, ie) = 0
-      endif
-      if (edgeq%reverse(south, ie)) then
-        reverse(3, ie) = 1
-      else
-        reverse(3, ie) = 0
-      endif
-      if (edgeq%reverse(north, ie)) then
-        reverse(4, ie) = 1
-      else
-        reverse(4, ie) = 0
-      endif
-    enddo
-
-    param_s%Dinv = loc(elem(nets)%Dinv)
-    param_s%rspheremp = loc(elem(nets)%rspheremp)
-    param_s%spheremp = loc(elem(nets)%spheremp)
-    param_s%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
-    param_s%tensorVisc = loc(elem(nets)%tensorVisc)
-    param_s%Qtens = loc(Qtens)
-    param_s%Dvv = loc(deriv%Dvv)
-    param_s%buf = loc(edgeq%buf)
-    param_s%putmap = loc(edgeq%putmap(1,nets))
-    param_s%reverse = loc(reverse)
-    param_s%rrearth = rrearth
-    param_s%hypervis_scaling = hypervis_scaling
-    param_s%hypervis_power = hypervis_power
-    param_s%nets = nets
-    param_s%nete = nete
-    param_s%qsize = qsize
-    param_s%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
-    call athread_spawn(slave_biharmonic_wk_scalar, param_s)
-    call athread_join()
-    call t_stopf('sw_biharmonic_1')
-
-    call t_startf('bndry_exchangeV_bi')
-    call bndry_exchangeV(hybrid,edgeq)
-    call t_stopf('bndry_exchangeV_bi')
-
-    call t_startf('sw_biharmonic_2')
-    param_s2%Dinv = loc(elem(nets)%Dinv)
-    param_s2%rspheremp = loc(elem(nets)%rspheremp)
-    param_s2%spheremp = loc(elem(nets)%spheremp)
-    param_s2%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
-    param_s2%tensorVisc = loc(elem(nets)%tensorVisc)
-    param_s2%Qtens = loc(Qtens)
-    param_s2%Dvv = loc(deriv%Dvv)
-    param_s2%receive = loc(edgeq%receive)
-    param_s2%getmap = loc(edgeq%getmap(1,nets))
-    param_s2%rrearth = rrearth
-    param_s2%hypervis_scaling = hypervis_scaling
-    param_s2%hypervis_power = hypervis_power
-    param_s2%nets = nets
-    param_s2%nete = nete
-    param_s2%qsize = qsize
-    param_s2%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
-    call athread_spawn(slave_biharmonic_wk_scalar_2, param_s2)
-    call athread_join()
-    call t_stopf('sw_biharmonic_2')
-  end subroutine
-#endif
-
-#ifdef BIHARMONIC_ORGINAL
-  subroutine biharmonic_wk_scalar(elem,qtens,deriv,edgeq,hybrid,nets,nete)
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  ! compute weak biharmonic operator
-  !    input:  qtens = Q
-  !    output: qtens = weak biharmonic of Q
-  !
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  type (hybrid_t)      , intent(in) :: hybrid
-  type (element_t)     , intent(inout), target :: elem(:)
-  integer :: nets,nete
-  real (kind=real_kind), dimension(np,np,nlev,qsize,nets:nete) :: qtens
-  type (EdgeBuffer_t)  , intent(inout) :: edgeq
-  type (derivative_t)  , intent(in) :: deriv
-
-  ! local
-  integer :: k,kptr,i,j,ie,ic,q
-  real (kind=real_kind), dimension(np,np) :: lap_p
-  logical var_coef1
-
-     !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
-     !so tensor is only used on second call to laplace_sphere_wk
-     var_coef1 = .true.
-     if(hypervis_scaling > 0)    var_coef1 = .false.
+  !call gradient_sphere(s,deriv,elem%Dinv, grads)
 
 
+  real(kind=real_kind) ::  dsdx00
+  real(kind=real_kind) ::  dsdy00
+  real(kind=real_kind) ::  v1(np,np),v2(np,np)
 
-     do ie=nets,nete
-        do q=1,qsize
-           do k=1,nlev    !  Potential loop inversion (AAM)
-              lap_p(:,:)=qtens(:,:,k,q,ie)
-  ! Original use of qtens on left and right hand sides caused OpenMP errors (AAM)
-             !qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=var_coef1)
-             call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=var_coef1)
+  real(kind=real_kind) ::  vtemp(np,np,2)
+  integer :: reverse(4, nets:nete)
+
+  integer :: step_elem
+  external :: slave_biharmonic_wk_scalar
+  external :: slave_biharmonic_wk_scalar_2
+  type param_t
+    integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
+        , Dvv, buf
+    integer*8 :: putmap, reverse
+    real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
+    integer :: nets, nete, qsize, step_elem
+  end type param_t
+  type(param_t) :: param_s
+  type param_2_t
+    integer*8 :: Dinv, rspheremp, spheremp, variable_hyperviscosity, tensorVisc, Qtens     \
+        , Dvv, receive
+    integer*8 :: getmap
+    real(kind=real_kind) :: rrearth, hypervis_scaling, hypervis_power
+    integer :: nets, nete, qsize, step_elem
+  end type param_2_t
+  type(param_2_t) :: param_s2
+
+   var_coef1 = .true.
+   if(hypervis_scaling > 0)    var_coef1 = .false.
+
+#define SW_LAP
+#ifdef SW_LAP
+call t_startf('sw_biharmonic_1')
+do ie = nets, nete
+  if (edgeq%reverse(west, ie)) then
+    reverse(1, ie) = 1
+  else
+    reverse(1, ie) = 0
+  endif
+  if (edgeq%reverse(east, ie)) then
+    reverse(2, ie) = 1
+  else
+    reverse(2, ie) = 0
+  endif
+  if (edgeq%reverse(south, ie)) then
+    reverse(3, ie) = 1
+  else
+    reverse(3, ie) = 0
+  endif
+  if (edgeq%reverse(north, ie)) then
+    reverse(4, ie) = 1
+  else
+    reverse(4, ie) = 0
+  endif
+enddo
+
+param_s%Dinv = loc(elem(nets)%Dinv)
+param_s%rspheremp = loc(elem(nets)%rspheremp)
+param_s%spheremp = loc(elem(nets)%spheremp)
+param_s%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
+param_s%tensorVisc = loc(elem(nets)%tensorVisc)
+param_s%Qtens = loc(Qtens)
+param_s%Dvv = loc(deriv%Dvv)
+param_s%buf = loc(edgeq%buf)
+param_s%putmap = loc(edgeq%putmap(1,nets))
+param_s%reverse = loc(reverse)
+param_s%rrearth = rrearth
+param_s%hypervis_scaling = hypervis_scaling
+param_s%hypervis_power = hypervis_power
+param_s%nets = nets
+param_s%nete = nete
+param_s%qsize = qsize
+param_s%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
+call athread_spawn(slave_biharmonic_wk_scalar, param_s)
+call athread_join()
+call t_stopf('sw_biharmonic_1')
+#else
+   call t_startf('local_biharmonic_1')
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
+   !so tensor is only used on second call to laplace_sphere_wk
+
+   do ie=nets,nete
+      do q=1,qsize
+         do k=1,nlev    !  Potential loop inversion (AAM)
+            lap_p(:,:)=qtens(:,:,k,q,ie)
+! Original use of qtens on left and right hand sides caused OpenMP errors (AAM)
+           !qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=var_coef1)
+           !call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=var_coef1)
+           !!!!!!!!!!!!!!!!!!!!!! call laplace_sphere_wk !!!!!!!!!!!!!!!!!!!!!!!
+           do j=1,np
+              do l=1,np
+                 dsdx00=0.0d0
+                 dsdy00=0.0d0
+         !DIR$ UNROLL(NP)
+                 do i=1,np
+                    dsdx00 = dsdx00 + deriv%Dvv(i,l  )*lap_p(i,j  )
+                    dsdy00 = dsdy00 + deriv%Dvv(i,l  )*lap_p(j  ,i)
+                 end do
+                 v1(l  ,j  ) = dsdx00*rrearth
+                 v2(j  ,l  ) = dsdy00*rrearth
+              end do
+           end do
+           ! convert covarient to latlon
+           !OMP_COLLAPSE_SIMD
+           !DIR_VECTOR_ALIGNED
+           do j=1,np
+              do i=1,np
+                 grads(i,j,1)=elem(ie)%Dinv(i,j,1,1)*v1(i,j) + elem(ie)%Dinv(i,j,2,1)*v2(i,j)
+                 grads(i,j,2)=elem(ie)%Dinv(i,j,1,2)*v1(i,j) + elem(ie)%Dinv(i,j,2,2)*v2(i,j)
+              enddo
            enddo
-           kptr = nlev*(q-1)
-           call edgeVpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
-        enddo
-     enddo
+         !!!!!!!!!!!!!!!! end gradient_sphere !!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+           var_coef = var_coef1
+           if (var_coef) then
+              if (hypervis_power/=0 ) then
+                 ! scalar viscosity with variable coefficient
+                 grads(:,:,1) = grads(:,:,1)*elem(ie)%variable_hyperviscosity(:,:)
+                 grads(:,:,2) = grads(:,:,2)*elem(ie)%variable_hyperviscosity(:,:)
+              else if (hypervis_scaling /=0 ) then
+                 ! tensor hv, (3)
+                 oldgrads=grads
+                 do j=1,np
+                    do i=1,np
+                       grads(i,j,1) = sum(oldgrads(i,j,:)*elem(ie)%tensorVisc(i,j,1,:))
+                       grads(i,j,2) = sum(oldgrads(i,j,:)*elem(ie)%tensorVisc(i,j,2,:))
+                    end do
+                 end do
+              else
+                 ! do nothing: constant coefficient viscsoity
+              endif
+           endif
 
-     call bndry_exchangeV(hybrid,edgeq)
+           ! note: divergnece_sphere and divergence_sphere_wk are identical *after* bndry_exchange
+           ! if input is C_0.  Here input is not C_0, so we should use divergence_sphere_wk().
 
-     do ie=nets,nete
-        ! apply inverse mass matrix, then apply laplace again
-        do q=1,qsize
-          kptr = nlev*(q-1)
-          call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
-          do k=1,nlev    !  Potential loop inversion (AAM)
-             lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
-             ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
-             call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=.true.)
-          enddo
-        enddo
-     enddo
-  #ifdef DEBUGOMP
-  #if (defined HORIZ_OPENMP)
-  !$OMP BARRIER
-  #endif
-  #endif
-  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  end subroutine
+           !call divergence_sphere_wk(grads,deriv,elem,laplace)
+
+           !!!!!!!!!!!!!!!!!!!!! call divergence_sphere_wk !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+           do j=1,np
+              do i=1,np
+                 vtemp(i,j,1)=(elem(ie)%Dinv(i,j,1,1)*grads(i,j,1) + elem(ie)%Dinv(i,j,1,2)*grads(i,j,2))
+                 vtemp(i,j,2)=(elem(ie)%Dinv(i,j,2,1)*grads(i,j,1) + elem(ie)%Dinv(i,j,2,2)*grads(i,j,2))
+              enddo
+           enddo
+
+           do n=1,np
+              do m=1,np
+
+                 qtens(m,n,k,q,ie)=0
+           !DIR$ UNROLL(NP)
+                 do j=1,np
+                    qtens(m,n,k,q,ie)=qtens(m,n,k,q,ie)-(elem(ie)%spheremp(j,n)*vtemp(j,n,1)*deriv%Dvv(m,j) &
+                                     +elem(ie)%spheremp(m,j)*vtemp(m,j,2)*deriv%Dvv(n,j)) &
+                                     * rrearth
+                 enddo
+               enddo
+             enddo
+
+         enddo
+      enddo
+    enddo
+    do ie = nets, nete
+      do q = 1, qsize
+         kptr = nlev*(q-1)
+         call edgeVpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
+      enddo
+   enddo
+   call t_stopf('local_biharmonic_1')
 #endif
+
+   call t_startf('bndry_exchangeV')
+   call bndry_exchangeV(hybrid,edgeq)
+   call t_stopf('bndry_exchangeV')
+
+#ifdef  SW_LAP
+
+  call t_startf('sw_biharmonic_2')
+  param_s2%Dinv = loc(elem(nets)%Dinv)
+  param_s2%rspheremp = loc(elem(nets)%rspheremp)
+  param_s2%spheremp = loc(elem(nets)%spheremp)
+  param_s2%variable_hyperviscosity = loc(elem(nets)%variable_hyperviscosity)
+  param_s2%tensorVisc = loc(elem(nets)%tensorVisc)
+  param_s2%Qtens = loc(Qtens)
+  param_s2%Dvv = loc(deriv%Dvv)
+  param_s2%receive = loc(edgeq%receive)
+  param_s2%getmap = loc(edgeq%getmap(1,nets))
+  param_s2%rrearth = rrearth
+  param_s2%hypervis_scaling = hypervis_scaling
+  param_s2%hypervis_power = hypervis_power
+  param_s2%nets = nets
+  param_s2%nete = nete
+  param_s2%qsize = qsize
+  param_s2%step_elem = (loc(elem(nets+1)%Dinv) - loc(elem(nets)%Dinv))/8
+  call athread_spawn(slave_biharmonic_wk_scalar_2, param_s2)
+  call athread_join()
+  call t_stopf('sw_biharmonic_2')
+
+#else
+  call t_startf('local_biharmonic_2')
+  do ie=nets,nete
+   ! apply inverse mass matrix, then apply laplace again
+    do q=1,qsize
+      kptr = nlev*(q-1)
+      call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
+    enddo
+  enddo
+  do ie = nets, nete
+    do q = 1, qsize
+      do k=1,nlev    !  Potential loop inversion (AAM)
+        lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
+        ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
+        call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=.true.)
+      enddo
+    enddo
+  enddo
+  call t_stopf('local_biharmonic_2')
+#endif
+#else
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! origin biharmonic_wk_scalar code !!!!!!!!!!!!!!!!!!!!!!!
+type (hybrid_t)      , intent(in) :: hybrid
+type (element_t)     , intent(inout), target :: elem(:)
+integer :: nets,nete
+real (kind=real_kind), dimension(np,np,nlev,qsize,nets:nete) :: qtens
+type (EdgeBuffer_t)  , intent(inout) :: edgeq
+type (derivative_t)  , intent(in) :: deriv
+
+! local
+integer :: k,kptr,i,j,ie,ic,q
+real (kind=real_kind), dimension(np,np) :: lap_p
+logical var_coef1
+
+   !if tensor hyperviscosity with tensor V is used, then biharmonic operator is (\grad\cdot V\grad) (\grad \cdot \grad)
+   !so tensor is only used on second call to laplace_sphere_wk
+   var_coef1 = .true.
+   if(hypervis_scaling > 0)    var_coef1 = .false.
+
+
+
+   do ie=nets,nete
+      do q=1,qsize
+         do k=1,nlev    !  Potential loop inversion (AAM)
+            lap_p(:,:)=qtens(:,:,k,q,ie)
+! Original use of qtens on left and right hand sides caused OpenMP errors (AAM)
+           !qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=var_coef1)
+           call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=var_coef1)
+         enddo
+         kptr = nlev*(q-1)
+         call edgeVpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
+      enddo
+   enddo
+
+   call bndry_exchangeV(hybrid,edgeq)
+
+   do ie=nets,nete
+      ! apply inverse mass matrix, then apply laplace again
+      do q=1,qsize
+        kptr = nlev*(q-1)
+        call edgeVunpack(edgeq, qtens(:,:,1:nlev,q,ie),nlev,kptr,ie)
+        do k=1,nlev    !  Potential loop inversion (AAM)
+           lap_p(:,:)=elem(ie)%rspheremp(:,:)*qtens(:,:,k,q,ie)
+           ! qtens(:,:,k,q,ie)=laplace_sphere_wk(lap_p,deriv,elem(ie),var_coef=.true.)
+           call laplace_sphere_wk(lap_p,deriv,elem(ie),qtens(:,:,k,q,ie),var_coef=.true.)
+        enddo
+      enddo
+   enddo
+#ifdef DEBUGOMP
+#if (defined HORIZ_OPENMP)
+!$OMP BARRIER
+#endif
+#endif
+#endif
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+end subroutine
 
 subroutine biharmonic_wk_scalar_minmax(elem,qtens,deriv,edgeq,edgeminmax,hybrid,nets,nete,emin,emax)
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
